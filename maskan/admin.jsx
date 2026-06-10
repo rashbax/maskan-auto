@@ -130,12 +130,14 @@ function Listings({ lang, STR, onEdit, apartments }) {
 }
 
 // ---- add/edit with photo uploader ----
-function EditApt({ lang, STR, id, onBack }) {
+function EditApt({ lang, STR, id, onBack, apartments, onSaved }) {
   const M = MASKAN;
-  const apt = id === "new" ? null : aptById(id);
+  const apt = id === "new" ? null : (apartments || []).find((a) => a.id === id);
   const tone = apt ? apt.tone : "sage";
   const count = apt ? apt.photos : 6;
   const [cover, setCover] = useState(0);
+  const [title, setTitle] = useState(apt ? (apt.title?.[lang] || "") : "");
+  const [saving, setSaving] = useState(false);
   const [price, setPrice] = useState(apt ? apt.price : 35);
   const [amen, setAmen] = useState(apt ? apt.amenities : ["wifi", "ac", "kitchen"]);
   const [guests, setGuests] = useState(apt ? apt.sleeps : 2);
@@ -148,6 +150,26 @@ function EditApt({ lang, STR, id, onBack }) {
   const [pin, setPin] = useState({ x: 50, y: 48 });
   const allAmen = Object.keys(M.AMENITIES);
   const fld = "mt-1.5 w-full h-12 px-4 rounded-xl bg-white border border-line outline-none focus:border-green-600 focus:ring-2 focus:ring-green-600/15 transition text-[15px]";
+  async function save() {
+    setSaving(true);
+    const newId = apt?.id || ("apt-" + Date.now().toString(36));
+    const titleI18n = apt ? { ...apt.title, [lang]: title } : { uz: title, ru: title, en: title };
+    const blurbI18n = apt ? { ...apt.blurb, [lang]: desc } : { uz: desc, ru: desc, en: desc };
+    const nearI18n = apt?.near || { uz: "", ru: "", en: "" };
+    try {
+      await saveApartment({
+        id: newId, tone,
+        price_usd: price, district, sleeps: guests, beds, baths, size_m2: size,
+        title: titleI18n, blurb: blurbI18n, near: nearI18n,
+        amenities: amen, photos_count: count, status: "active",
+      }, address);
+      if (onSaved) await onSaved();
+      onBack();
+    } catch (e) {
+      console.error("saveApartment failed:", e);
+      setSaving(false);
+    }
+  }
   return (
     <div className="max-w-3xl">
       <button onClick={onBack} className="inline-flex items-center gap-1.5 text-[13.5px] font-semibold text-inksoft mb-4 hover:text-ink"><Icon name="arrowL" size={16} />{STR[lang].a_listings}</button>
@@ -170,6 +192,11 @@ function EditApt({ lang, STR, id, onBack }) {
           </button>
         </div>
       </div>
+      {/* title */}
+      <label className="block mb-5">
+        <span className="text-[13px] font-bold">{lang === "ru" ? "Название" : lang === "uz" ? "Nomi" : "Title"}</span>
+        <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={lang === "ru" ? "Напр. Светлая студия в центре" : lang === "uz" ? "Masalan, Markazdagi yorug studiya" : "e.g. Bright studio in the centre"} className={fld} />
+      </label>
       {/* basics */}
       <div className="grid sm:grid-cols-2 gap-4 mb-5">
         <label className="block"><span className="text-[13px] font-bold">{STR[lang].a_price} ($)</span>
@@ -228,7 +255,7 @@ function EditApt({ lang, STR, id, onBack }) {
           {allAmen.map((a) => <Chip key={a} active={amen.includes(a)} icon={AMENITY_ICON[a]} onClick={() => setAmen(amen.includes(a) ? amen.filter((x) => x !== a) : [...amen, a])}>{M.AMENITIES[a][lang]}</Chip>)}
         </div>
       </div>
-      <div className="flex gap-3"><Button onClick={onBack}>{STR[lang].a_save}</Button><Button variant="ghost" onClick={onBack}>{STR[lang].back}</Button></div>
+      <div className="flex gap-3"><Button onClick={save} disabled={saving} className={saving ? "opacity-60 pointer-events-none" : ""}>{STR[lang].a_save}</Button><Button variant="ghost" onClick={onBack}>{STR[lang].back}</Button></div>
     </div>
   );
 }
@@ -578,7 +605,7 @@ export function Admin({ lang, STR, device, onExit, openLang, role, auth, onLogin
           </div>
         </header>
         <main className="flex-1 px-5 md:px-8 py-6 overflow-y-auto no-scrollbar">
-          {editId ? <EditApt lang={lang} STR={STR} id={editId} onBack={() => setEditId(null)} />
+          {editId ? <EditApt lang={lang} STR={STR} id={editId} onBack={() => setEditId(null)} apartments={apts} onSaved={() => getApartments().then(setApts)} />
             : tab === "dash" ? <Dashboard lang={lang} STR={STR} bookings={bookings} apartments={apts} />
             : tab === "list" ? <Listings lang={lang} STR={STR} onEdit={setEditId} apartments={apts} />
             : tab === "cal" ? <CalManager lang={lang} STR={STR} apartments={apts} bookings={bookings} />

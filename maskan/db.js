@@ -199,3 +199,14 @@ export async function setReviewReply(id, reply) {
   await sb.from("reviews").update({ host_reply: reply }).eq("id", id);
   await sb.from("review_audit").insert({ review_id: id, action: "reply", who: "admin" });
 }
+
+// ---------- admin: create / update an apartment (text fields) ----------
+export async function saveApartment(row, address) {
+  const sb = createClient();
+  const { error } = await sb.from("apartments").upsert(row);
+  if (error) throw error;
+  if (address != null && address !== "") {
+    await sb.from("apartment_private").upsert({ apartment_id: row.id, address });
+  }
+  return row.id;
+}
