@@ -206,7 +206,9 @@ function EditApt({ lang, STR, id, onBack, apartments, onSaved }) {
   const tone = apt ? apt.tone : "sage";
   const count = apt ? apt.photos : 6;
   const [cover, setCover] = useState(0);
-  const [title, setTitle] = useState(apt ? (apt.title?.[lang] || "") : "");
+  const [titleI18n, setTitleI18n] = useState(apt ? { uz: apt.title?.uz || "", ru: apt.title?.ru || "", en: apt.title?.en || "" } : { uz: "", ru: "", en: "" });
+  const [blurbI18n, setBlurbI18n] = useState(apt ? { uz: apt.blurb?.uz || "", ru: apt.blurb?.ru || "", en: apt.blurb?.en || "" } : { uz: "", ru: "", en: "" });
+  const [editLang, setEditLang] = useState(lang);
   const [saving, setSaving] = useState(false);
   const [aptId] = useState(apt?.id || ("apt-" + Date.now().toString(36)));
   const [photos, setPhotos] = useState([]);
@@ -218,15 +220,19 @@ function EditApt({ lang, STR, id, onBack, apartments, onSaved }) {
   const [beds, setBeds] = useState(apt ? apt.beds : 1);
   const [baths, setBaths] = useState(apt ? apt.baths : 1);
   const [size, setSize] = useState(apt ? apt.size : 40);
-  const [desc, setDesc] = useState(apt ? apt.blurb[lang] : "");
   const [district, setDistrict] = useState(apt ? apt.district : "mirobod");
   const [address, setAddress] = useState("");
   const [pin, setPin] = useState({ x: 50, y: 48 });
   const allAmen = Object.keys(M.AMENITIES);
   const fld = "mt-1.5 w-full h-12 px-4 rounded-xl bg-white border border-line outline-none focus:border-green-600 focus:ring-2 focus:ring-green-600/15 transition text-[15px]";
+  const langTabs = (
+    <div className="flex gap-1">
+      {[["uz", "UZ"], ["ru", "RU"], ["en", "EN"]].map(([k, label]) => (
+        <button key={k} type="button" onClick={() => setEditLang(k)} className={`h-7 px-2.5 rounded-full text-[11.5px] font-bold transition ${editLang === k ? "bg-ink text-cream" : "bg-black/[.04] text-inksoft hover:text-ink"}`}>{label}</button>
+      ))}
+    </div>
+  );
   function buildRow() {
-    const titleI18n = apt ? { ...apt.title, [lang]: title } : { uz: title, ru: title, en: title };
-    const blurbI18n = apt ? { ...apt.blurb, [lang]: desc } : { uz: desc, ru: desc, en: desc };
     const nearI18n = apt?.near || { uz: "", ru: "", en: "" };
     return { id: aptId, tone, price_usd: price, district, sleeps: guests, beds, baths, size_m2: size, title: titleI18n, blurb: blurbI18n, near: nearI18n, amenities: amen, photos_count: photos.length || count, status: "active" };
   }
@@ -293,10 +299,13 @@ function EditApt({ lang, STR, id, onBack, apartments, onSaved }) {
         </div>
         <p className="text-[12px] text-inksoft mt-2">{lang === "ru" ? "Фото авто-сжимаются (WebP) и грузятся в R2." : lang === "uz" ? "Rasm avtomatik kichrayadi (WebP) va R2'ga yuklanadi." : "Photos are auto-compressed (WebP) and uploaded to R2."}</p>
       </div>
-      {/* title */}
+      {/* title (3 languages) */}
       <label className="block mb-5">
-        <span className="text-[13px] font-bold">{lang === "ru" ? "Название" : lang === "uz" ? "Nomi" : "Title"}</span>
-        <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={lang === "ru" ? "Напр. Светлая студия в центре" : lang === "uz" ? "Masalan, Markazdagi yorug studiya" : "e.g. Bright studio in the centre"} className={fld} />
+        <div className="flex items-center justify-between">
+          <span className="text-[13px] font-bold">{lang === "ru" ? "Название" : lang === "uz" ? "Nomi" : "Title"}</span>
+          {langTabs}
+        </div>
+        <input value={titleI18n[editLang]} onChange={(e) => setTitleI18n({ ...titleI18n, [editLang]: e.target.value })} placeholder={lang === "ru" ? "Напр. Светлая студия в центре" : lang === "uz" ? "Masalan, Markazdagi yorug studiya" : "e.g. Bright studio in the centre"} className={fld} />
       </label>
       {/* basics */}
       <div className="grid sm:grid-cols-2 gap-4 mb-5">
@@ -320,10 +329,13 @@ function EditApt({ lang, STR, id, onBack, apartments, onSaved }) {
         </div>
       </div>
 
-      {/* description */}
+      {/* description (3 languages) */}
       <label className="block mb-6">
-        <span className="text-[13px] font-bold">{STR[lang].a_desc}</span>
-        <textarea rows={4} value={desc} onChange={(e) => setDesc(e.target.value)} placeholder={STR[lang].a_desc_ph}
+        <div className="flex items-center justify-between">
+          <span className="text-[13px] font-bold">{STR[lang].a_desc}</span>
+          {langTabs}
+        </div>
+        <textarea rows={4} value={blurbI18n[editLang]} onChange={(e) => setBlurbI18n({ ...blurbI18n, [editLang]: e.target.value })} placeholder={STR[lang].a_desc_ph}
           className="mt-1.5 w-full px-4 py-3 rounded-xl bg-white border border-line outline-none focus:border-green-600 focus:ring-2 focus:ring-green-600/15 transition text-[15px] resize-none leading-relaxed" />
       </label>
 
