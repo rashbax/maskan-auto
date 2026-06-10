@@ -1,10 +1,7 @@
 "use client";
 import { useState } from "react";
-import { MASKAN } from "./data";
 import { Icon, Logo, Button, Photo, GoogleG, uzs, tgHref } from "./ui";
 import { AptCard, StateBlock, fmtRange } from "./catalog";
-
-const MA = () => MASKAN;
 
 export const NAV = [
   { key: "search", icon: "search" },
@@ -115,10 +112,10 @@ function StatusBadge({ status, lang, STR }) {
   return <span className={`inline-flex items-center h-6 px-2.5 rounded-full text-[11.5px] font-bold ${s.cls}`}>{s.label}</span>;
 }
 
-function BookingCard({ b, lang, STR, onOpen, onBookAgain }) {
-  const M = MA();
-  const apt = M.APARTMENTS.find((a) => a.id === b.apt);
+function BookingCard({ b, lang, STR, onOpen, onBookAgain, apartments }) {
+  const apt = (apartments || []).find((a) => a.id === b.apt);
   const [menu, setMenu] = useState(false);
+  if (!apt) return null;
   return (
     <div className="rounded-2xl border border-line bg-white p-3 relative">
       <div className="flex gap-3">
@@ -158,11 +155,10 @@ function BookingCard({ b, lang, STR, onOpen, onBookAgain }) {
   );
 }
 
-export function BookingsPage({ lang, STR, device, tab, setTab, openLang, auth, onLogin, onOpen, onBookAgain }) {
-  const M = MA();
+export function BookingsPage({ lang, STR, device, tab, setTab, openLang, auth, onLogin, onOpen, onBookAgain, bookings, apartments }) {
   const [sub, setSub] = useState("active");
   const tabs = [["active", STR[lang].tab_active], ["past", STR[lang].tab_past], ["cancelled", STR[lang].tab_cancelled]];
-  const items = M.GUEST_BOOKINGS.filter((b) => b.status === sub);
+  const items = (bookings || []).filter((b) => b.status === sub);
   return (
     <PageShell lang={lang} STR={STR} device={device} tab={tab} setTab={setTab} openLang={openLang} title={STR[lang].bookings_title}>
       {!auth ? <GuestGate lang={lang} STR={STR} onLogin={onLogin} /> : (
@@ -174,7 +170,7 @@ export function BookingsPage({ lang, STR, device, tab, setTab, openLang, auth, o
           </div>
           {items.length === 0 ? <StateBlock icon="ticket" title={STR[lang].bookings_empty} sub={STR[lang].bookings_empty_sub} action={STR[lang].nav_search} onAction={() => setTab("search")} />
             : <div className={`grid gap-3 ${device === "desktop" ? "grid-cols-2" : "grid-cols-1"}`}>
-                {items.map((b) => <BookingCard key={b.id} b={b} lang={lang} STR={STR} onOpen={onOpen} onBookAgain={onBookAgain} />)}
+                {items.map((b) => <BookingCard key={b.id} b={b} lang={lang} STR={STR} onOpen={onOpen} onBookAgain={onBookAgain} apartments={apartments} />)}
               </div>}
         </div>
       )}

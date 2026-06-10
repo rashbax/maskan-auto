@@ -68,6 +68,7 @@ export async function getApartments() {
 // the guest (via the contact left here) to hand over keys at check-in.
 export async function createBooking({ apartmentId, guestName, phone, telegram, messenger, from, to, price }) {
   const sb = createClient();
+  const { data: { user } } = await sb.auth.getUser();
   const checkin = MASKAN.iso(from);
   const checkout = MASKAN.iso(to);
   const nights = Math.round((to - from) / 86400000);
@@ -76,6 +77,7 @@ export async function createBooking({ apartmentId, guestName, phone, telegram, m
   const { error } = await sb.from("bookings").insert({
     id,
     apartment_id: apartmentId,
+    user_id: user?.id ?? null, // link to the account if signed in
     guest_name: guestName || null,
     phone: phone || null,
     telegram: telegram || null,
@@ -89,4 +91,42 @@ export async function createBooking({ apartmentId, guestName, phone, telegram, m
   });
   if (error) throw error;
   return id;
+}
+
+// ---------- favorites (signed-in users; RLS = own rows) ----------
+export async function getFavorites() {
+  const sb = createClient();
+  const { data, error } = await sb.from("favorites").select("apartment_id");
+  if (error) return new Set();
+  return new Set((data || []).map((r) => r.apartment_id));
+}
+
+export async function addFavorite(apartmentId) {
+  const sb = createClient();
+  const { data: { user } } = await sb.auth.getUser();
+  if (!user) return;
+  await sb.from("favorites").insert({ user_id: user.id, apartment_id: apartmentId });
+}
+
+export async function removeFavorite(apartmentId) {
+  const sb = createClient();
+  const { data: { user } } = await sb.auth.getUser();
+  if (!user) return;
+  await sb.from("favorites").delete().eq("user_id", user.id).eq("apartment_id", apartmentId);
+}
+
+// ---------- this user's bookings (RLS = own rows) ----------
+export async function getMyBookings() {
+  const sb = createClient();
+  const { data, error } = await sb.from("bookings").select("*").order("checkin", { ascending: false });
+  if (error) return [];
+  return (data || []).map((b) => ({
+    id: b.id,
+    apt: b.apartment_id,
+    from: b.checkin,
+    to: b.checkout,
+    nights: b.nights,
+    usd: b.total_usd,
+    status: b.status === "checked-out" ? "past" : b.status,
+  }));
 }

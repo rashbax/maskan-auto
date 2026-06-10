@@ -7,7 +7,7 @@ import { Detail } from "./detail";
 import { Booking } from "./booking";
 import { SavedPage, BookingsPage, AccountPage, BottomNav } from "./account";
 import { Admin } from "./admin";
-import { getApartments } from "./db";
+import { getApartments, getFavorites, getMyBookings, addFavorite, removeFavorite } from "./db";
 import { sb, mapUser, signInWithGoogle, signOut } from "./auth";
 
 const LANGS = ["uz", "ru", "en"];
@@ -40,6 +40,7 @@ export default function App() {
   const [saved, setSaved] = useState(() => new Set());
   const [auth, setAuth] = useState(null);
   const [apartments, setApartments] = useState(null); // null = loading; from Supabase
+  const [myBookings, setMyBookings] = useState([]);
 
   useEffect(() => {
     let alive = true;
@@ -57,6 +58,13 @@ export default function App() {
     return () => sub.subscription.unsubscribe();
   }, []);
 
+  // load this user's favorites + bookings when signed in (clear on sign out)
+  useEffect(() => {
+    if (!auth) { setSaved(new Set()); setMyBookings([]); return; }
+    getFavorites().then(setSaved);
+    getMyBookings().then(setMyBookings);
+  }, [auth?.id]);
+
   useEffect(() => {
     const onResize = () => setDevice(window.innerWidth >= 760 ? "desktop" : "mobile");
     window.addEventListener("resize", onResize);
@@ -69,7 +77,12 @@ export default function App() {
   const goAdmin = () => setRoute({ screen: "admin" });
   const openApt = (apt) => { setRange(filters.range?.from ? filters.range : { from: null, to: null }); setRoute({ screen: "detail", apt }); };
   const book = (apt, r) => { setRange(r); setRoute({ screen: "booking", apt }); };
-  const toggleSave = (id) => setSaved((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  const toggleSave = (id) => setSaved((s) => {
+    const n = new Set(s);
+    if (n.has(id)) { n.delete(id); if (auth) removeFavorite(id); }
+    else { n.add(id); if (auth) addFavorite(id); }
+    return n;
+  });
   const login = (provider) => {
     if (provider === "telegram") { alert("Telegram bilan kirish keyingi qadamda — hozircha Google bilan kiring."); return; }
     signInWithGoogle();
@@ -87,7 +100,7 @@ export default function App() {
   else if (route.screen === "detail") screen = <Detail {...common} apt={route.apt} range={range} setRange={setRange} onBack={goCatalog} onBook={book} saved={saved} toggleSave={toggleSave} />;
   else if (route.screen === "booking") screen = <Booking {...common} apt={route.apt} range={range} onBack={() => setRoute({ screen: "detail", apt: route.apt })} onHome={goCatalog} onBooked={refreshApartments} />;
   else if (route.screen === "saved") screen = <SavedPage {...common} apartments={apartments} saved={saved} toggleSave={toggleSave} onOpen={openApt} auth={auth} onLogin={login} />;
-  else if (route.screen === "bookings") screen = <BookingsPage {...common} auth={auth} onLogin={login} onOpen={openApt} onBookAgain={openApt} />;
+  else if (route.screen === "bookings") screen = <BookingsPage {...common} auth={auth} onLogin={login} onOpen={openApt} onBookAgain={openApt} bookings={myBookings} apartments={apartments} />;
   else if (route.screen === "account") screen = <AccountPage {...common} auth={auth} onLogin={login} onLogout={logout} setLang={setLang} />;
   else if (route.screen === "admin") screen = <Admin {...common} onExit={goCatalog} />;
 
