@@ -195,6 +195,27 @@ export async function cancelBooking(id) {
   return !error;
 }
 
+// admin records an external booking (verbal / OLX / Booking.com) — counts toward revenue
+export async function createManualBooking({ apartmentId, guestName, phone, from, to, total, source }) {
+  const sb = createClient();
+  const nights = Math.round((new Date(to) - new Date(from)) / 86400000);
+  const id = "BK-M-" + Date.now().toString().slice(-7);
+  const { error } = await sb.from("bookings").insert({
+    id,
+    apartment_id: apartmentId,
+    guest_name: guestName || null,
+    phone: phone || null,
+    checkin: from,
+    checkout: to,
+    nights,
+    total_usd: total ?? null,
+    source: source || "manual",
+    status: "active",
+  });
+  if (error) throw error;
+  return id;
+}
+
 // ---------- current user's role (guest | admin) ----------
 export async function getMyRole() {
   const sb = createClient();

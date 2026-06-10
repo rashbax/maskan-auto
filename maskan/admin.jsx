@@ -1,11 +1,11 @@
 "use client";
 import { useState, useEffect, useRef, createRef } from "react";
 import { MASKAN } from "./data";
-import { Icon, Logo, Button, Chip, Badge, Photo, Stepper, AMENITY_ICON, GoogleG } from "./ui";
+import { Icon, Logo, Button, Chip, Badge, Photo, Stepper, AMENITY_ICON, GoogleG, Sheet } from "./ui";
 import { calMonths, calWD, buildMonth, dOnly } from "./calendar";
 import { fmtRange } from "./catalog";
 import { StarRow } from "./reviews";
-import { getApartments, getAllBookings, cancelBooking, getBlocks, blockDay, unblockDay, getAllReviews, setReviewHidden, setReviewReply, saveApartment, deleteApartment, requestUploadUrl, addPhoto, getPhotos, deletePhoto } from "./db";
+import { getApartments, getAllBookings, cancelBooking, createManualBooking, getBlocks, blockDay, unblockDay, getAllReviews, setReviewHidden, setReviewReply, saveApartment, deleteApartment, requestUploadUrl, addPhoto, getPhotos, deletePhoto } from "./db";
 
 const SRC = {
   website: { color: "#1B5E40", bg: "#EAF1EC", key: "src_website" },
@@ -89,19 +89,89 @@ function BookingRow({ b, lang, STR, onCancel, apartments }) {
   );
 }
 
+// ---- manual booking form (external: verbal / OLX / Booking.com) ----
+function ManualBookingForm({ lang, STR, apartments, onDone }) {
+  const apts = apartments || [];
+  const [aptId, setAptId] = useState(apts[0]?.id || "");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [guest, setGuest] = useState("");
+  const [phone, setPhone] = useState("");
+  const [source, setSource] = useState("manual");
+  const [total, setTotal] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const apt = apts.find((a) => a.id === aptId);
+  const nights = from && to ? Math.round((new Date(to) - new Date(from)) / 86400000) : 0;
+  const suggested = apt && nights > 0 ? apt.price * nights : 0;
+  const fld = "mt-1.5 w-full h-12 px-4 rounded-xl bg-white border border-line outline-none focus:border-green-600 focus:ring-2 focus:ring-green-600/15 transition text-[15px]";
+  const T = (ru, uz, en) => (lang === "ru" ? ru : lang === "uz" ? uz : en);
+  const msgs = { required: T("Заполните квартиру и даты", "Kvartira va sanalarni toʻldiring", "Fill apartment and dates"), dates: T("Выезд должен быть позже заезда", "Ketish kelishdan keyin boʻlsin", "Check-out must be after check-in"), overlap: T("Эти даты уже заняты", "Bu sanalar allaqachon band", "These dates are already taken"), fail: T("Не удалось", "Boʻlmadi", "Failed") };
+  async function submit() {
+    setErr("");
+    if (!aptId || !from || !to) { setErr("required"); return; }
+    if (nights <= 0) { setErr("dates"); return; }
+    setBusy(true);
+    try {
+      await createManualBooking({ apartmentId: aptId, guestName: guest, phone, from, to, total: total ? +total : suggested, source });
+      onDone();
+    } catch (e) {
+      setBusy(false);
+      setErr(/exclusion|overlap|conflicting/i.test(e.message || "") ? "overlap" : "fail");
+    }
+  }
+  return (
+    <div className="space-y-4 pb-2">
+      <label className="block"><span className="text-[13px] font-bold">{T("Квартира", "Kvartira", "Apartment")}</span>
+        <select value={aptId} onChange={(e) => setAptId(e.target.value)} className={fld}>
+          {apts.map((a) => <option key={a.id} value={a.id}>{a.title[lang]}</option>)}
+        </select></label>
+      <div className="grid grid-cols-2 gap-3">
+        <label className="block"><span className="text-[13px] font-bold">{STR[lang].checkin}</span><input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className={fld} /></label>
+        <label className="block"><span className="text-[13px] font-bold">{STR[lang].checkout}</span><input type="date" value={to} onChange={(e) => setTo(e.target.value)} className={fld} /></label>
+      </div>
+      <label className="block"><span className="text-[13px] font-bold">{STR[lang].a_guest}</span><input value={guest} onChange={(e) => setGuest(e.target.value)} placeholder={STR[lang].name_ph} className={fld} /></label>
+      <label className="block"><span className="text-[13px] font-bold">{STR[lang].phone}</span><input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+998 ..." className={fld} /></label>
+      <div>
+        <span className="text-[13px] font-bold">{STR[lang].a_source}</span>
+        <div className="grid grid-cols-2 gap-2.5 mt-1.5">
+          {[["manual", STR[lang].src_manual], ["booking", STR[lang].src_booking]].map(([k, label]) => (
+            <button key={k} type="button" onClick={() => setSource(k)} className={`flex items-center justify-center gap-2 h-11 rounded-xl border text-[14px] font-semibold transition ${source === k ? "border-green-600 bg-green-50 text-green-700" : "border-line bg-white text-ink"}`}>
+              <span className="w-2.5 h-2.5 rounded-full" style={{ background: SRC[k].color }} />{label}
+            </button>
+          ))}
+        </div>
+      </div>
+      <label className="block"><span className="text-[13px] font-bold">{STR[lang].a_price} ($)</span>
+        <input type="number" value={total} onChange={(e) => setTotal(e.target.value)} placeholder={suggested ? String(suggested) : "0"} className={fld + " tnum"} />
+        {nights > 0 && <div className="text-[12px] text-inksoft mt-1.5">{STR[lang].night_n(nights)} · {T("предложено", "taklif", "suggested")}: ${suggested}</div>}
+      </label>
+      {err && <div className="text-[13px] text-[#9a4a3c] bg-red-50 rounded-lg p-3">{msgs[err]}</div>}
+      <Button full size="lg" icon="check" onClick={submit} disabled={busy} className={busy ? "opacity-60 pointer-events-none" : ""}>{busy ? "…" : T("Добавить бронь", "Bron qoʻshish", "Add booking")}</Button>
+    </div>
+  );
+}
+
 // ---- bookings list ----
-function BookingsList({ lang, STR, bookings, apartments }) {
+function BookingsList({ lang, STR, bookings, apartments, onChanged }) {
   const [items, setItems] = useState(bookings || []);
+  const [adding, setAdding] = useState(false);
   useEffect(() => { setItems(bookings || []); }, [bookings]);
   async function cancel(x) {
     setItems((arr) => arr.map((i) => (i.id === x.id ? { ...i, status: "cancelled" } : i)));
     await cancelBooking(x.id);
   }
   return (
-    <div className="space-y-2">
-      {items.length === 0
-        ? <div className="text-[14px] text-inksoft py-8 text-center border border-dashed border-line rounded-2xl">—</div>
-        : items.map((b) => <BookingRow key={b.id} b={b} lang={lang} STR={STR} onCancel={cancel} apartments={apartments} />)}
+    <div>
+      <div className="flex justify-end mb-4"><Button icon="plusbox" onClick={() => setAdding(true)}>{lang === "ru" ? "Добавить бронь" : lang === "uz" ? "Bron qoʻshish" : "Add booking"}</Button></div>
+      <div className="space-y-2">
+        {items.length === 0
+          ? <div className="text-[14px] text-inksoft py-8 text-center border border-dashed border-line rounded-2xl">—</div>
+          : items.map((b) => <BookingRow key={b.id} b={b} lang={lang} STR={STR} onCancel={cancel} apartments={apartments} />)}
+      </div>
+      <Sheet open={adding} onClose={() => setAdding(false)} title={lang === "ru" ? "Ручная бронь" : lang === "uz" ? "Qoʻlda bron" : "Manual booking"} desktop>
+        <ManualBookingForm lang={lang} STR={STR} apartments={apartments} onDone={() => { setAdding(false); onChanged && onChanged(); }} />
+      </Sheet>
     </div>
   );
 }
@@ -641,7 +711,7 @@ export function Admin({ lang, STR, device, onExit, openLang, role, auth, onLogin
             : tab === "list" ? <Listings lang={lang} STR={STR} onEdit={setEditId} apartments={apts} />
             : tab === "cal" ? <CalManager lang={lang} STR={STR} apartments={apts} bookings={bookings} />
             : tab === "reviews" ? <ReviewsModeration lang={lang} STR={STR} apartments={apts} />
-            : <BookingsList lang={lang} STR={STR} bookings={bookings} apartments={apts} />}
+            : <BookingsList lang={lang} STR={STR} bookings={bookings} apartments={apts} onChanged={() => getAllBookings().then(setBookings)} />}
         </main>
       </div>
     </div>
