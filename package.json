@@ -10,6 +10,8 @@
     "check:data": "node --env-file=.env.local scripts/check-data.mjs"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1065.0",
+    "@aws-sdk/s3-request-presigner": "^3.1065.0",
     "@supabase/ssr": "^0.12.0",
     "@supabase/supabase-js": "^2.108.0",
     "next": "16.2.7",

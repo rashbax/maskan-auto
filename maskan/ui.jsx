@@ -124,7 +124,7 @@ export function Stars({ rating, reviews, lang, STR }) {
 }
 
 // ---------------- Photo placeholder w/ blur-up ----------------
-export function Photo({ tone, idx = 0, label = "apartment photo", className = "", rounded = "", eager = false, showLabel = true }) {
+export function Photo({ tone, idx = 0, label = "apartment photo", className = "", rounded = "", eager = false, showLabel = true, src }) {
   const T = MASKAN.TONES[tone] || MASKAN.TONES.stone;
   const [sharp, setSharp] = useState(eager);
   const ref = useRef(null);
@@ -143,7 +143,8 @@ export function Photo({ tone, idx = 0, label = "apartment photo", className = ""
       <div className="absolute inset-0" style={{ background: `radial-gradient(120% 120% at 30% 20%, ${T.a}, ${T.b})` }} />
       {/* sharp striped layer fades/sharpens in */}
       <div className="absolute inset-0 transition-all duration-[600ms]" style={{ background: stripe, opacity: sharp ? 1 : 0, filter: sharp ? "blur(0px)" : "blur(14px)", transform: sharp ? "scale(1)" : "scale(1.06)" }} />
-      {showLabel && (
+      {src && <img src={src} alt={label} loading={eager ? "eager" : "lazy"} className="absolute inset-0 w-full h-full object-cover" />}
+      {showLabel && !src && (
         <div className="absolute inset-0 grid place-items-center">
           <span className="font-mono text-[10.5px] tracking-tight px-2 py-1 rounded-md backdrop-blur-sm" style={{ color: T.ink, background: "rgba(255,255,255,.42)" }}>{label}</span>
         </div>

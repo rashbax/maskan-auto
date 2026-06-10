@@ -22,7 +22,7 @@ export function AptCard({ apt, lang, STR, filters, onOpen, device, saved, onTogg
   return (
     <div role="button" tabIndex={0} onClick={() => onOpen(apt)} onKeyDown={(e) => e.key === "Enter" && onOpen(apt)} className="group text-left w-full fade-up cursor-pointer">
       <div className="relative aspect-[4/3] rounded-2xl overflow-hidden shadow-card">
-        <Photo tone={apt.tone} idx={apt.id.charCodeAt(1)} label="apartment photo" className="w-full h-full group-hover:scale-[1.03] transition-transform duration-500" />
+        <Photo tone={apt.tone} idx={apt.id.charCodeAt(1)} src={apt.photoUrls?.[0]} label="apartment photo" className="w-full h-full group-hover:scale-[1.03] transition-transform duration-500" />
         <div className="absolute top-3 left-3 flex gap-2">
           {apt.superhost && <Badge tone="cream" icon="shield">{STR[lang].superhost}</Badge>}
           {d.centre && <Badge tone="ink">{STR[lang].centre}</Badge>}

@@ -20,14 +20,14 @@ function GalleryViewer({ apt, start, onClose }) {
         <button className="w-10 h-10 grid place-items-center rounded-full hover:bg-white/10"><Icon name="heart" size={20} /></button>
       </div>
       <div className="flex-1 relative grid place-items-center px-2 min-h-0">
-        <Photo tone={apt.tone} idx={i} eager label={GALLERY_LABELS[i % GALLERY_LABELS.length]} className="w-full h-full max-h-full rounded-xl" rounded="rounded-xl" />
+        <Photo tone={apt.tone} idx={i} eager src={apt.photoUrls?.[i]} label={GALLERY_LABELS[i % GALLERY_LABELS.length]} className="w-full h-full max-h-full rounded-xl" rounded="rounded-xl" />
         <button onClick={() => setI((i - 1 + n) % n)} className="absolute left-3 w-11 h-11 grid place-items-center rounded-full bg-white/90 text-ink hover:scale-105 transition"><Icon name="chevL" size={22} /></button>
         <button onClick={() => setI((i + 1) % n)} className="absolute right-3 w-11 h-11 grid place-items-center rounded-full bg-white/90 text-ink hover:scale-105 transition"><Icon name="chevR" size={22} /></button>
       </div>
       <div className="h-20 flex gap-2 overflow-x-auto no-scrollbar px-4 py-3 shrink-0">
         {Array.from({ length: n }).map((_, k) => (
           <button key={k} onClick={() => setI(k)} className={`relative h-full aspect-[4/3] rounded-lg overflow-hidden shrink-0 ${k === i ? "ring-2 ring-cream" : "opacity-60"}`}>
-            <Photo tone={apt.tone} idx={k} eager showLabel={false} className="w-full h-full" />
+            <Photo tone={apt.tone} idx={k} eager showLabel={false} src={apt.photoUrls?.[k]} className="w-full h-full" />
           </button>
         ))}
       </div>
@@ -138,7 +138,7 @@ export function Detail({ apt, lang, STR, device, range, setRange, onBack, onBook
           <div ref={heroRef} className="flex overflow-x-auto no-scrollbar snap-x snap-mandatory aspect-[4/3]">
             {Array.from({ length: Math.min(apt.photos, 8) }).map((_, k) => (
               <div key={k} className="w-full shrink-0 snap-center" onClick={() => setViewer(k)}>
-                <Photo tone={apt.tone} idx={k} eager={k < 2} label={GALLERY_LABELS[k % GALLERY_LABELS.length]} className="w-full h-full" />
+                <Photo tone={apt.tone} idx={k} eager={k < 2} src={apt.photoUrls?.[k]} label={GALLERY_LABELS[k % GALLERY_LABELS.length]} className="w-full h-full" />
               </div>
             ))}
           </div>
@@ -166,8 +166,8 @@ export function Detail({ apt, lang, STR, device, range, setRange, onBack, onBook
           </header>
           <div className="max-w-6xl mx-auto px-8 pt-6">
             <div className="grid grid-cols-4 grid-rows-2 gap-2 h-[420px] rounded-3xl overflow-hidden">
-              <div className="col-span-2 row-span-2 cursor-pointer" onClick={() => setViewer(0)}><Photo tone={apt.tone} idx={0} eager label={GALLERY_LABELS[0]} className="w-full h-full" /></div>
-              {[1, 2, 3, 4].map((k) => <div key={k} className="cursor-pointer relative" onClick={() => setViewer(k)}><Photo tone={apt.tone} idx={k} eager={k < 3} label={GALLERY_LABELS[k]} className="w-full h-full" />
+              <div className="col-span-2 row-span-2 cursor-pointer" onClick={() => setViewer(0)}><Photo tone={apt.tone} idx={0} eager src={apt.photoUrls?.[0]} label={GALLERY_LABELS[0]} className="w-full h-full" /></div>
+              {[1, 2, 3, 4].map((k) => <div key={k} className="cursor-pointer relative" onClick={() => setViewer(k)}><Photo tone={apt.tone} idx={k} eager={k < 3} src={apt.photoUrls?.[k]} label={GALLERY_LABELS[k]} className="w-full h-full" />
                 {k === 4 && <button onClick={(e) => { e.stopPropagation(); setViewer(0); }} className="absolute bottom-3 right-3 inline-flex items-center gap-1.5 h-9 px-3.5 rounded-full bg-white/94 text-[13px] font-bold shadow-sm"><Icon name="grid" size={15} />{STR[lang].see_all_photos(apt.photos)}</button>}
               </div>)}
             </div>

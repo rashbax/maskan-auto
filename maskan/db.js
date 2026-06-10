@@ -8,11 +8,15 @@ import { MASKAN } from "./data";
 export async function getApartments() {
   const sb = createClient();
 
-  const [aptRes, revRes] = await Promise.all([
+  const [aptRes, revRes, photoRes] = await Promise.all([
     sb.from("apartments").select("*").eq("status", "active").order("id"),
     sb.from("reviews").select("*").eq("hidden", false).order("created_at", { ascending: false }),
+    sb.from("apartment_photos").select("apartment_id,url,sort,is_cover"),
   ]);
   if (aptRes.error) throw aptRes.error;
+
+  const photosByApt = {};
+  (photoRes.data || []).forEach((p) => { (photosByApt[p.apartment_id] ||= []).push(p); });
 
   // availability via security-definer RPC (graceful: works even before 0002 is applied)
   const busyByApt = {};
@@ -59,9 +63,43 @@ export async function getApartments() {
     amenities: a.amenities || [],
     lat: a.lat != null ? Number(a.lat) : undefined,
     lng: a.lng != null ? Number(a.lng) : undefined,
+    photoUrls: (photosByApt[a.id] || [])
+      .slice()
+      .sort((x, y) => (y.is_cover ? 1 : 0) - (x.is_cover ? 1 : 0) || x.sort - y.sort)
+      .map((p) => p.url),
     busy: busyByApt[a.id] || new Set(),
     reviewsList: reviewsByApt[a.id] || [],
   }));
+}
+
+// ---------- admin: photo upload (presigned R2) ----------
+export async function requestUploadUrl(apartmentId, contentType) {
+  const res = await fetch("/api/upload-url", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ apartmentId, contentType }),
+  });
+  if (!res.ok) {
+    const j = await res.json().catch(() => ({}));
+    throw new Error(j.error || "upload_url_failed");
+  }
+  return res.json(); // { url, publicUrl }
+}
+
+export async function addPhoto(apartmentId, url, sort, isCover) {
+  const sb = createClient();
+  await sb.from("apartment_photos").insert({ apartment_id: apartmentId, url, sort: sort || 0, is_cover: !!isCover });
+}
+
+export async function getPhotos(apartmentId) {
+  const sb = createClient();
+  const { data } = await sb.from("apartment_photos").select("*").eq("apartment_id", apartmentId).order("sort");
+  return data || [];
+}
+
+export async function deletePhoto(id) {
+  const sb = createClient();
+  await sb.from("apartment_photos").delete().eq("id", id);
 }
 
 // Create an instant booking. Access codes are NOT auto-sent — the host contacts

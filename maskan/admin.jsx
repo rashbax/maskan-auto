@@ -1,11 +1,11 @@
 "use client";
-import { useState, useEffect, createRef } from "react";
+import { useState, useEffect, useRef, createRef } from "react";
 import { MASKAN } from "./data";
 import { Icon, Logo, Button, Chip, Badge, Photo, Stepper, AMENITY_ICON, GoogleG } from "./ui";
 import { calMonths, calWD, buildMonth, dOnly } from "./calendar";
 import { fmtRange } from "./catalog";
 import { StarRow } from "./reviews";
-import { getApartments, getAllBookings, cancelBooking, getBlocks, blockDay, unblockDay, getAllReviews, setReviewHidden, setReviewReply } from "./db";
+import { getApartments, getAllBookings, cancelBooking, getBlocks, blockDay, unblockDay, getAllReviews, setReviewHidden, setReviewReply, saveApartment, requestUploadUrl, addPhoto, getPhotos, deletePhoto } from "./db";
 
 const SRC = {
   website: { color: "#1B5E40", bg: "#EAF1EC", key: "src_website" },
@@ -138,6 +138,10 @@ function EditApt({ lang, STR, id, onBack, apartments, onSaved }) {
   const [cover, setCover] = useState(0);
   const [title, setTitle] = useState(apt ? (apt.title?.[lang] || "") : "");
   const [saving, setSaving] = useState(false);
+  const [aptId] = useState(apt?.id || ("apt-" + Date.now().toString(36)));
+  const [photos, setPhotos] = useState([]);
+  const fileRef = useRef(null);
+  useEffect(() => { if (apt?.id) getPhotos(apt.id).then(setPhotos); }, []);
   const [price, setPrice] = useState(apt ? apt.price : 35);
   const [amen, setAmen] = useState(apt ? apt.amenities : ["wifi", "ac", "kitchen"]);
   const [guests, setGuests] = useState(apt ? apt.sleeps : 2);
@@ -150,47 +154,67 @@ function EditApt({ lang, STR, id, onBack, apartments, onSaved }) {
   const [pin, setPin] = useState({ x: 50, y: 48 });
   const allAmen = Object.keys(M.AMENITIES);
   const fld = "mt-1.5 w-full h-12 px-4 rounded-xl bg-white border border-line outline-none focus:border-green-600 focus:ring-2 focus:ring-green-600/15 transition text-[15px]";
-  async function save() {
-    setSaving(true);
-    const newId = apt?.id || ("apt-" + Date.now().toString(36));
+  function buildRow() {
     const titleI18n = apt ? { ...apt.title, [lang]: title } : { uz: title, ru: title, en: title };
     const blurbI18n = apt ? { ...apt.blurb, [lang]: desc } : { uz: desc, ru: desc, en: desc };
     const nearI18n = apt?.near || { uz: "", ru: "", en: "" };
-    try {
-      await saveApartment({
-        id: newId, tone,
-        price_usd: price, district, sleeps: guests, beds, baths, size_m2: size,
-        title: titleI18n, blurb: blurbI18n, near: nearI18n,
-        amenities: amen, photos_count: count, status: "active",
-      }, address);
-      if (onSaved) await onSaved();
-      onBack();
-    } catch (e) {
-      console.error("saveApartment failed:", e);
-      setSaving(false);
-    }
+    return { id: aptId, tone, price_usd: price, district, sleeps: guests, beds, baths, size_m2: size, title: titleI18n, blurb: blurbI18n, near: nearI18n, amenities: amen, photos_count: photos.length || count, status: "active" };
   }
+  async function persistApartment() { await saveApartment(buildRow(), address); }
+  async function save() {
+    setSaving(true);
+    try { await persistApartment(); if (onSaved) await onSaved(); onBack(); }
+    catch (e) { console.error("saveApartment failed:", e); setSaving(false); }
+  }
+  async function resizeImage(file, maxW = 1600, quality = 0.82) {
+    const img = await createImageBitmap(file);
+    const scale = Math.min(1, maxW / img.width);
+    const w = Math.round(img.width * scale), h = Math.round(img.height * scale);
+    const c = document.createElement("canvas"); c.width = w; c.height = h;
+    c.getContext("2d").drawImage(img, 0, 0, w, h);
+    return await new Promise((res) => c.toBlob(res, "image/webp", quality));
+  }
+  async function onFiles(e) {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+    setSaving(true);
+    try {
+      await persistApartment(); // ensure the apartment row exists (FK)
+      let sort = photos.length;
+      for (const f of files) {
+        const blob = await resizeImage(f);
+        const { url, publicUrl } = await requestUploadUrl(aptId, "image/webp");
+        const put = await fetch(url, { method: "PUT", headers: { "Content-Type": "image/webp" }, body: blob });
+        if (!put.ok) throw new Error("put_failed");
+        await addPhoto(aptId, publicUrl, sort, sort === 0);
+        sort++;
+      }
+      setPhotos(await getPhotos(aptId));
+    } catch (err) { console.error("upload failed:", err); }
+    setSaving(false);
+    if (fileRef.current) fileRef.current.value = "";
+  }
+  async function removePhoto(p) { await deletePhoto(p.id); setPhotos(await getPhotos(aptId)); }
   return (
     <div className="max-w-3xl">
       <button onClick={onBack} className="inline-flex items-center gap-1.5 text-[13.5px] font-semibold text-inksoft mb-4 hover:text-ink"><Icon name="arrowL" size={16} />{STR[lang].a_listings}</button>
       {/* photo uploader */}
       <div className="mb-7">
         <div className="text-[13px] font-bold uppercase tracking-wide text-inksoft mb-3">{STR[lang].a_photos}</div>
+        <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={onFiles} />
         <div className="grid grid-cols-3 sm:grid-cols-4 gap-2.5">
-          {Array.from({ length: Math.min(count, 8) }).map((_, k) => (
-            <div key={k} className="relative aspect-square rounded-xl overflow-hidden group border border-line">
-              <Photo tone={tone} idx={k} eager showLabel={false} className="w-full h-full" />
-              <div className="absolute inset-0 bg-ink/0 group-hover:bg-ink/30 transition-colors flex items-center justify-center gap-1.5 opacity-0 group-hover:opacity-100">
-                {cover !== k && <button onClick={() => setCover(k)} className="text-[11px] font-bold bg-white text-ink px-2 h-7 rounded-full">{STR[lang].a_setcover}</button>}
-              </div>
-              {cover === k && <div className="absolute top-1.5 left-1.5"><Badge tone="green">{STR[lang].a_cover}</Badge></div>}
-              <div className="absolute top-1.5 right-1.5 w-6 h-6 rounded-md bg-white/85 grid place-items-center cursor-grab opacity-0 group-hover:opacity-100"><Icon name="list" size={13} /></div>
+          {photos.map((p, k) => (
+            <div key={p.id} className="relative aspect-square rounded-xl overflow-hidden group border border-line">
+              <Photo tone={tone} idx={k} src={p.url} eager showLabel={false} className="w-full h-full" />
+              {k === 0 && <div className="absolute top-1.5 left-1.5"><Badge tone="green">{STR[lang].a_cover}</Badge></div>}
+              <button onClick={() => removePhoto(p)} className="absolute top-1.5 right-1.5 w-7 h-7 rounded-md bg-white/90 grid place-items-center text-[#9a4a3c] opacity-0 group-hover:opacity-100"><Icon name="trash" size={14} /></button>
             </div>
           ))}
-          <button className="aspect-square rounded-xl border-2 border-dashed border-line grid place-items-center text-inksoft hover:border-green-600 hover:text-green-700 transition">
-            <div className="text-center px-2"><Icon name="plus" size={22} className="mx-auto" /><div className="text-[10.5px] font-semibold mt-1 leading-tight">{STR[lang].a_drop}</div></div>
+          <button onClick={() => fileRef.current?.click()} disabled={saving} className="aspect-square rounded-xl border-2 border-dashed border-line grid place-items-center text-inksoft hover:border-green-600 hover:text-green-700 transition disabled:opacity-50">
+            <div className="text-center px-2"><Icon name={saving ? "refresh" : "plus"} size={22} className={`mx-auto ${saving ? "animate-spin" : ""}`} /><div className="text-[10.5px] font-semibold mt-1 leading-tight">{saving ? "…" : STR[lang].a_drop}</div></div>
           </button>
         </div>
+        <p className="text-[12px] text-inksoft mt-2">{lang === "ru" ? "Фото авто-сжимаются (WebP) и грузятся в R2." : lang === "uz" ? "Rasm avtomatik kichrayadi (WebP) va R2'ga yuklanadi." : "Photos are auto-compressed (WebP) and uploaded to R2."}</p>
       </div>
       {/* title */}
       <label className="block mb-5">
