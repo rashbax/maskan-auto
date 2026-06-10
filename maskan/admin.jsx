@@ -5,7 +5,7 @@ import { Icon, Logo, Button, Chip, Badge, Photo, Stepper, AMENITY_ICON, GoogleG 
 import { calMonths, calWD, buildMonth, dOnly } from "./calendar";
 import { fmtRange } from "./catalog";
 import { StarRow } from "./reviews";
-import { getApartments, getAllBookings, cancelBooking } from "./db";
+import { getApartments, getAllBookings, cancelBooking, getBlocks, blockDay, unblockDay, getAllReviews, setReviewHidden, setReviewReply } from "./db";
 
 const SRC = {
   website: { color: "#1B5E40", bg: "#EAF1EC", key: "src_website" },
@@ -107,13 +107,14 @@ function BookingsList({ lang, STR, bookings, apartments }) {
 }
 
 // ---- listings ----
-function Listings({ lang, STR, onEdit }) {
+function Listings({ lang, STR, onEdit, apartments }) {
   const M = MASKAN;
+  const apts = apartments || [];
   return (
     <div>
       <div className="flex justify-end mb-4"><Button icon="plusbox" onClick={() => onEdit("new")}>{STR[lang].a_add}</Button></div>
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {M.APARTMENTS.map((a) => (
+        {apts.map((a) => (
           <button key={a.id} onClick={() => onEdit(a.id)} className="text-left rounded-2xl border border-line bg-white overflow-hidden hover:shadow-card transition group">
             <div className="aspect-[16/10] relative"><Photo tone={a.tone} idx={0} eager showLabel={false} className="w-full h-full group-hover:scale-105 transition-transform duration-500" />
               <div className="absolute top-2.5 right-2.5"><Badge tone="cream">${a.price}</Badge></div></div>
@@ -233,25 +234,34 @@ function EditApt({ lang, STR, id, onBack }) {
 }
 
 // ---- calendar manager ----
-function CalManager({ lang, STR }) {
+function CalManager({ lang, STR, apartments, bookings }) {
   const M = MASKAN;
-  const [aptId, setAptId] = useState("a1");
-  const apt = aptById(aptId);
+  const apts = apartments || [];
+  const [aptId, setAptId] = useState(apts[0]?.id || "a1");
+  useEffect(() => { if (apts.length && !apts.find((a) => a.id === aptId)) setAptId(apts[0].id); }, [apts]);
+  const apt = apts.find((a) => a.id === aptId);
   const [view, setView] = useState({ y: M.TODAY.getFullYear(), m: M.TODAY.getMonth() });
   const [blocked, setBlocked] = useState(new Set());
+  useEffect(() => { getBlocks(aptId).then(setBlocked); }, [aptId]);
   // booking-source map for this apt
   const srcMap = {};
-  M.BOOKINGS.filter((b) => b.apt === aptId && b.status === "active").forEach((b) => {
+  (bookings || []).filter((b) => b.apt === aptId && b.status === "active").forEach((b) => {
     for (let x = new Date(b.from); x < new Date(b.to); x = M.addDays(x, 1)) srcMap[M.iso(x)] = b.source;
   });
   const cells = buildMonth(view.y, view.m);
   const today = dOnly(M.TODAY);
-  function toggle(d) { const k = M.iso(d); const s = new Set(blocked); s.has(k) ? s.delete(k) : s.add(k); setBlocked(s); }
+  async function toggle(d) {
+    const k = M.iso(d);
+    const s = new Set(blocked);
+    if (s.has(k)) { s.delete(k); setBlocked(s); await unblockDay(aptId, k); }
+    else { s.add(k); setBlocked(s); await blockDay(aptId, k); }
+  }
   function shift(delta) { let m = view.m + delta, y = view.y; if (m < 0) { m = 11; y--; } if (m > 11) { m = 0; y++; } setView({ y, m }); }
+  if (!apt) return null;
   return (
     <div className="max-w-xl">
       <div className="flex gap-2 overflow-x-auto no-scrollbar mb-5">
-        {M.APARTMENTS.map((a) => <Chip key={a.id} active={a.id === aptId} onClick={() => setAptId(a.id)}>{a.title[lang].split(",")[0].split(" ").slice(0, 3).join(" ")}</Chip>)}
+        {apts.map((a) => <Chip key={a.id} active={a.id === aptId} onClick={() => setAptId(a.id)}>{a.title[lang].split(",")[0].split(" ").slice(0, 3).join(" ")}</Chip>)}
       </div>
       <div className="rounded-2xl border border-line bg-white p-5">
         <div className="flex items-center justify-between mb-4">
@@ -263,7 +273,7 @@ function CalManager({ lang, STR }) {
         <div className="grid grid-cols-7 gap-1">
           {cells.map((d, i) => {
             if (!d) return <div key={i} />;
-            const k = M.iso(d); const past = d < today; const src = srcMap[k]; const isBlocked = blocked.has(k) || (apt.busy.has(k) && !src);
+            const k = M.iso(d); const past = d < today; const src = srcMap[k]; const isBlocked = blocked.has(k);
             const booked = !!src;
             return (
               <button key={i} disabled={past || booked} onClick={() => toggle(d)}
@@ -377,13 +387,20 @@ function AdminLogin({ lang, STR, onLogin, onExit }) {
 }
 
 // ---- reviews moderation (soft-hide + audit + reply) ----
-function ReviewsModeration({ lang, STR }) {
-  const M = MASKAN;
-  const [items, setItems] = useState(() => {
-    const all = [];
-    M.APARTMENTS.forEach((a) => (a.reviewsList || []).forEach((r, i) => all.push({ ...r, _apt: a, _id: a.id + "-" + i, hidden: false, reply: "" })));
-    return all;
-  });
+function ReviewsModeration({ lang, STR, apartments }) {
+  const [items, setItems] = useState([]);
+  useEffect(() => {
+    getAllReviews().then((rows) => {
+      const apts = apartments || [];
+      setItems(rows.map((r) => ({
+        ...r,
+        _apt: apts.find((a) => a.id === r.apartment_id) || { title: { [lang]: r.apartment_id } },
+        _id: r.id,
+        hidden: r.hidden,
+        reply: r.host_reply || "",
+      })));
+    });
+  }, [apartments, lang]);
   const [audit, setAudit] = useState([]);
   const [hideFor, setHideFor] = useState(null);
   const [replyFor, setReplyFor] = useState(null);
@@ -392,19 +409,23 @@ function ReviewsModeration({ lang, STR }) {
   const now = () => { const d = new Date(); return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`; };
   const log = (e) => setAudit((a) => [{ ...e, when: now(), who: "Dilnoza (admin)" }, ...a]);
 
-  function doHide(it, reason) {
+  async function doHide(it, reason) {
     setItems((xs) => xs.map((x) => x._id === it._id ? { ...x, hidden: true } : x));
     log({ action: STR[lang].a_hide, reason, target: `${it.name} · ${it._apt.title[lang].slice(0, 24)}…` });
     setHideFor(null);
+    await setReviewHidden(it._id, true, reason);
   }
-  function unhide(it) {
+  async function unhide(it) {
     setItems((xs) => xs.map((x) => x._id === it._id ? { ...x, hidden: false } : x));
     log({ action: STR[lang].a_unhide, reason: "—", target: `${it.name} · ${it._apt.title[lang].slice(0, 24)}…` });
+    await setReviewHidden(it._id, false);
   }
-  function saveReply(it) {
-    setItems((xs) => xs.map((x) => x._id === it._id ? { ...x, reply: replyText } : x));
+  async function saveReply(it) {
+    const txt = replyText;
+    setItems((xs) => xs.map((x) => x._id === it._id ? { ...x, reply: txt } : x));
     log({ action: STR[lang].a_reply, reason: "—", target: `${it.name} · ${it._apt.title[lang].slice(0, 24)}…` });
     setReplyFor(null); setReplyText("");
+    await setReviewReply(it._id, txt);
   }
 
   return (
@@ -559,9 +580,9 @@ export function Admin({ lang, STR, device, onExit, openLang, role, auth, onLogin
         <main className="flex-1 px-5 md:px-8 py-6 overflow-y-auto no-scrollbar">
           {editId ? <EditApt lang={lang} STR={STR} id={editId} onBack={() => setEditId(null)} />
             : tab === "dash" ? <Dashboard lang={lang} STR={STR} bookings={bookings} apartments={apts} />
-            : tab === "list" ? <Listings lang={lang} STR={STR} onEdit={setEditId} />
-            : tab === "cal" ? <CalManager lang={lang} STR={STR} />
-            : tab === "reviews" ? <ReviewsModeration lang={lang} STR={STR} />
+            : tab === "list" ? <Listings lang={lang} STR={STR} onEdit={setEditId} apartments={apts} />
+            : tab === "cal" ? <CalManager lang={lang} STR={STR} apartments={apts} bookings={bookings} />
+            : tab === "reviews" ? <ReviewsModeration lang={lang} STR={STR} apartments={apts} />
             : <BookingsList lang={lang} STR={STR} bookings={bookings} apartments={apts} />}
         </main>
       </div>

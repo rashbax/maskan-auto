@@ -165,3 +165,37 @@ export async function getMyRole() {
   const { data } = await sb.from("profiles").select("role").eq("id", user.id).single();
   return data?.role || "guest";
 }
+
+// ---------- admin: manual availability blocks ----------
+export async function getBlocks(apartmentId) {
+  const sb = createClient();
+  const { data, error } = await sb.from("availability_blocks").select("date").eq("apartment_id", apartmentId);
+  if (error) return new Set();
+  return new Set((data || []).map((r) => r.date));
+}
+export async function blockDay(apartmentId, date) {
+  const sb = createClient();
+  await sb.from("availability_blocks").insert({ apartment_id: apartmentId, date });
+}
+export async function unblockDay(apartmentId, date) {
+  const sb = createClient();
+  await sb.from("availability_blocks").delete().eq("apartment_id", apartmentId).eq("date", date);
+}
+
+// ---------- admin: review moderation (admin sees hidden too via RLS) ----------
+export async function getAllReviews() {
+  const sb = createClient();
+  const { data, error } = await sb.from("reviews").select("*").order("created_at", { ascending: false });
+  if (error) return [];
+  return data || [];
+}
+export async function setReviewHidden(id, hidden, reason) {
+  const sb = createClient();
+  await sb.from("reviews").update({ hidden }).eq("id", id);
+  await sb.from("review_audit").insert({ review_id: id, action: hidden ? "hide" : "unhide", reason: reason || null, who: "admin" });
+}
+export async function setReviewReply(id, reply) {
+  const sb = createClient();
+  await sb.from("reviews").update({ host_reply: reply }).eq("id", id);
+  await sb.from("review_audit").insert({ review_id: id, action: "reply", who: "admin" });
+}

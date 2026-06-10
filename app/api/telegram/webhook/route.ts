@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { createAdminClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 
@@ -36,27 +35,8 @@ export async function POST(req: Request) {
   if (!chatId) return NextResponse.json({ ok: true });
 
   if (text.startsWith("/start")) {
-    const payload = text.split(" ")[1]?.trim();
-    if (payload) {
-      const sb = createAdminClient();
-      const { data: b } = await sb.from("bookings").select("*").eq("id", payload).single();
-      if (b) {
-        const { data: apt } = await sb.from("apartments").select("title").eq("id", b.apartment_id).single();
-        const title = apt?.title?.uz || apt?.title?.ru || b.apartment_id;
-        await send(chatId, [
-          "✅ Broningiz tasdiqlandi — Maskan",
-          `🏠 ${title}`,
-          `📅 ${b.checkin} → ${b.checkout} (${b.nights} kecha)`,
-          `💵 $${b.total_usd ?? "—"}`,
-          `🔖 ${b.id}`,
-          "",
-          "Uy egasi kelishingizdan oldin shu yerda bogʻlanib, aniq manzil va kalitlarni beradi.",
-          "Savolingiz boʻlsa — shu chatga yozavering.",
-        ].join("\n"));
-        return NextResponse.json({ ok: true });
-      }
-    }
-    await send(chatId, "Salom! Maskan botiga xush kelibsiz. Bron qilganingizdan soʻng tasdiq shu yerga keladi.");
+    // The bot does NOT reveal booking details to anyone. Just a welcome.
+    await send(chatId, "Salom! Maskan botiga xush kelibsiz. Savolingiz boʻlsa shu yerga yozing — javob beramiz.");
     return NextResponse.json({ ok: true });
   }
 
