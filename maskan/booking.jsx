@@ -115,12 +115,14 @@ export function Booking({ apt, range, lang, STR, device, onBack, onHome, onBooke
   function validate() {
     const e = {};
     if (!form.name.trim()) e.name = "!";
-    if (form.phone.replace(/\D/g, "").length < 9) e.phone = "!";
+    // international phone: 9–15 digits, only +, digits, spaces, dashes, parentheses (NOT UZ-only)
+    const digits = form.phone.replace(/\D/g, "");
+    if (digits.length < 9 || digits.length > 15 || !/^\+?[\d\s\-()]+$/.test(form.phone.trim())) e.phone = "!";
     setErrs(e); return Object.keys(e).length === 0;
   }
   function submit() {
     if (!validate()) return;
-    setStep("otp");
+    finishOtp(); // OTP step disabled for now (re-enable later if needed)
   }
   async function finishOtp() {
     setStep("confirming");
@@ -157,7 +159,7 @@ export function Booking({ apt, range, lang, STR, device, onBack, onHome, onBooke
             <Field label={STR[lang].your_name} error={errs.name && "⚠"}>
               <input className={inputCls} placeholder={STR[lang].name_ph} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
             </Field>
-            <Field label={STR[lang].phone} help={STR[lang].phone_help} error={errs.phone && "⚠"}>
+            <Field label={STR[lang].phone} help={STR[lang].phone_help} error={errs.phone && (lang === "ru" ? "неверный номер" : lang === "uz" ? "notoʻgʻri raqam" : "invalid number")}>
               <input className={inputCls} inputMode="tel" placeholder="+998 90 123 45 67" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
             </Field>
             <div>
