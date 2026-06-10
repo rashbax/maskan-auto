@@ -8,6 +8,7 @@ import { Booking } from "./booking";
 import { SavedPage, BookingsPage, AccountPage, BottomNav } from "./account";
 import { Admin } from "./admin";
 import { getApartments } from "./db";
+import { sb, mapUser, signInWithGoogle, signOut } from "./auth";
 
 const LANGS = ["uz", "ru", "en"];
 
@@ -48,6 +49,14 @@ export default function App() {
     return () => { alive = false; };
   }, []);
 
+  // real Supabase session
+  useEffect(() => {
+    const client = sb();
+    client.auth.getSession().then(({ data }) => setAuth(mapUser(data.session?.user)));
+    const { data: sub } = client.auth.onAuthStateChange((_e, session) => setAuth(mapUser(session?.user)));
+    return () => sub.subscription.unsubscribe();
+  }, []);
+
   useEffect(() => {
     const onResize = () => setDevice(window.innerWidth >= 760 ? "desktop" : "mobile");
     window.addEventListener("resize", onResize);
@@ -61,8 +70,11 @@ export default function App() {
   const openApt = (apt) => { setRange(filters.range?.from ? filters.range : { from: null, to: null }); setRoute({ screen: "detail", apt }); };
   const book = (apt, r) => { setRange(r); setRoute({ screen: "booking", apt }); };
   const toggleSave = (id) => setSaved((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
-  const login = (provider) => setAuth({ provider, name: "Aziz Karimov", handle: provider === "telegram" ? "@aziz_tashkent" : "aziz.karimov@gmail.com" });
-  const logout = () => setAuth(null);
+  const login = (provider) => {
+    if (provider === "telegram") { alert("Telegram bilan kirish keyingi qadamda — hozircha Google bilan kiring."); return; }
+    signInWithGoogle();
+  };
+  const logout = () => signOut();
   const refreshApartments = () => getApartments().then(setApartments).catch(() => {});
 
   const GUEST_TABS = ["catalog", "saved", "bookings", "account"];
