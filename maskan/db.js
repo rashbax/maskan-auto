@@ -131,6 +131,32 @@ export async function getMyBookings() {
   }));
 }
 
+// ---------- admin: all bookings (RLS lets an admin read every row) ----------
+export async function getAllBookings() {
+  const sb = createClient();
+  const { data, error } = await sb.from("bookings").select("*").order("checkin", { ascending: true });
+  if (error) return [];
+  return (data || []).map((b) => ({
+    id: b.id,
+    apt: b.apartment_id,
+    guest: b.guest_name,
+    phone: b.phone,
+    tg: b.telegram,
+    from: b.checkin,
+    to: b.checkout,
+    nights: b.nights,
+    total: b.total_usd,
+    source: b.source,
+    status: b.status,
+  }));
+}
+
+export async function cancelBooking(id) {
+  const sb = createClient();
+  const { error } = await sb.from("bookings").update({ status: "cancelled" }).eq("id", id);
+  return !error;
+}
+
 // ---------- current user's role (guest | admin) ----------
 export async function getMyRole() {
   const sb = createClient();

@@ -5,6 +5,7 @@ import { Icon, Logo, Button, Chip, Badge, Photo, Stepper, AMENITY_ICON, GoogleG 
 import { calMonths, calWD, buildMonth, dOnly } from "./calendar";
 import { fmtRange } from "./catalog";
 import { StarRow } from "./reviews";
+import { getApartments, getAllBookings, cancelBooking } from "./db";
 
 const SRC = {
   website: { color: "#1B5E40", bg: "#EAF1EC", key: "src_website" },
@@ -38,12 +39,13 @@ function NumF({ label, value, set, min = 0, max = 999 }) {
 function aptById(id) { return MASKAN.APARTMENTS.find((a) => a.id === id); }
 
 // ---- dashboard ----
-function Dashboard({ lang, STR }) {
+function Dashboard({ lang, STR, bookings, apartments }) {
   const M = MASKAN;
   const today = M.iso(M.TODAY);
-  const todays = M.BOOKINGS.filter((b) => b.from === today);
-  const upcoming = M.BOOKINGS.filter((b) => b.from > today && b.status === "active");
-  const revenue = M.BOOKINGS.reduce((s, b) => s + b.total, 0);
+  const list = bookings || [];
+  const todays = list.filter((b) => b.from === today);
+  const upcoming = list.filter((b) => b.from > today && b.status === "active");
+  const revenue = list.filter((b) => b.status !== "cancelled").reduce((s, b) => s + (b.total || 0), 0);
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -55,12 +57,12 @@ function Dashboard({ lang, STR }) {
       <div>
         <h3 className="font-serif text-[19px] mb-3">{STR[lang].a_today}</h3>
         {todays.length === 0 ? <div className="text-[14px] text-inksoft py-6 text-center border border-dashed border-line rounded-2xl">—</div> : (
-          <div className="space-y-2">{todays.map((b) => <BookingRow key={b.id} b={b} lang={lang} STR={STR} />)}</div>
+          <div className="space-y-2">{todays.map((b) => <BookingRow key={b.id} b={b} lang={lang} STR={STR} apartments={apartments} />)}</div>
         )}
       </div>
       <div>
         <h3 className="font-serif text-[19px] mb-3">{STR[lang].a_upcoming}</h3>
-        <div className="space-y-2">{upcoming.map((b) => <BookingRow key={b.id} b={b} lang={lang} STR={STR} />)}</div>
+        <div className="space-y-2">{upcoming.map((b) => <BookingRow key={b.id} b={b} lang={lang} STR={STR} apartments={apartments} />)}</div>
       </div>
     </div>
   );
@@ -71,8 +73,9 @@ function SourceTag({ src, lang, STR }) {
   return <span className="inline-flex items-center gap-1.5 px-2.5 h-6 rounded-full text-[11.5px] font-bold" style={{ color: s.color, background: s.bg }}><span className="w-1.5 h-1.5 rounded-full" style={{ background: s.color }} />{STR[lang][s.key]}</span>;
 }
 
-function BookingRow({ b, lang, STR, onCancel }) {
-  const apt = aptById(b.apt);
+function BookingRow({ b, lang, STR, onCancel, apartments }) {
+  const apt = (apartments || []).find((a) => a.id === b.apt) || aptById(b.apt);
+  if (!apt) return null;
   return (
     <div className="flex items-center gap-3 p-3 rounded-xl border border-line bg-white">
       <div className="w-11 h-11 rounded-lg overflow-hidden shrink-0"><Photo tone={apt.tone} idx={0} eager showLabel={false} className="w-full h-full" /></div>
@@ -87,12 +90,18 @@ function BookingRow({ b, lang, STR, onCancel }) {
 }
 
 // ---- bookings list ----
-function BookingsList({ lang, STR }) {
-  const M = MASKAN;
-  const [items, setItems] = useState(M.BOOKINGS);
+function BookingsList({ lang, STR, bookings, apartments }) {
+  const [items, setItems] = useState(bookings || []);
+  useEffect(() => { setItems(bookings || []); }, [bookings]);
+  async function cancel(x) {
+    setItems((arr) => arr.map((i) => (i.id === x.id ? { ...i, status: "cancelled" } : i)));
+    await cancelBooking(x.id);
+  }
   return (
     <div className="space-y-2">
-      {items.map((b) => <BookingRow key={b.id} b={b} lang={lang} STR={STR} onCancel={(x) => setItems(items.map((i) => i.id === x.id ? { ...i, status: "cancelled" } : i))} />)}
+      {items.length === 0
+        ? <div className="text-[14px] text-inksoft py-8 text-center border border-dashed border-line rounded-2xl">—</div>
+        : items.map((b) => <BookingRow key={b.id} b={b} lang={lang} STR={STR} onCancel={cancel} apartments={apartments} />)}
     </div>
   );
 }
@@ -500,6 +509,13 @@ function AdminGate({ lang, STR, onLogin, onExit }) {
 export function Admin({ lang, STR, device, onExit, openLang, role, auth, onLogin }) {
   const [tab, setTab] = useState("dash");
   const [editId, setEditId] = useState(null);
+  const [apts, setApts] = useState([]);
+  const [bookings, setBookings] = useState([]);
+  useEffect(() => {
+    if (role !== "admin") return;
+    getApartments().then(setApts);
+    getAllBookings().then(setBookings);
+  }, [role]);
 
   if (!auth) return <AdminGate lang={lang} STR={STR} onLogin={onLogin} onExit={onExit} />;
   if (role == null) return <div className="min-h-screen bg-canvas grid place-items-center"><div className="w-10 h-10 rounded-full border-[3px] border-green-600/25 border-t-green-700 animate-spin" /></div>;
@@ -542,11 +558,11 @@ export function Admin({ lang, STR, device, onExit, openLang, role, auth, onLogin
         </header>
         <main className="flex-1 px-5 md:px-8 py-6 overflow-y-auto no-scrollbar">
           {editId ? <EditApt lang={lang} STR={STR} id={editId} onBack={() => setEditId(null)} />
-            : tab === "dash" ? <Dashboard lang={lang} STR={STR} />
+            : tab === "dash" ? <Dashboard lang={lang} STR={STR} bookings={bookings} apartments={apts} />
             : tab === "list" ? <Listings lang={lang} STR={STR} onEdit={setEditId} />
             : tab === "cal" ? <CalManager lang={lang} STR={STR} />
             : tab === "reviews" ? <ReviewsModeration lang={lang} STR={STR} />
-            : <BookingsList lang={lang} STR={STR} />}
+            : <BookingsList lang={lang} STR={STR} bookings={bookings} apartments={apts} />}
         </main>
       </div>
     </div>
