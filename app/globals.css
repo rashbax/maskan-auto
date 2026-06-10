@@ -1,26 +1,124 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* ============================================================
+   Maskan — Design System tokens (single source of truth)
+   ============================================================ */
+@theme {
+  /* Typeface */
+  --font-sans: var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
+  --font-serif: var(--font-spectral), ui-serif, Georgia, serif;
+
+  /* Surfaces & ink */
+  --color-canvas: #fbf7f0;
+  --color-cream: #f5eada;
+  --color-creamdeep: #f9ecdc;
+  --color-ink: #1a1a17;
+  --color-inksoft: #6b675c;
+  --color-line: #e8dece;
+
+  /* Brand green scale (overrides Tailwind defaults for the shades we use) */
+  --color-green-50: #eaf1ec;
+  --color-green-100: #d6e4da;
+  --color-green-600: #1b5e40;
+  --color-green-700: #164f36;
+  --color-green-900: #14402f;
+
+  /* Elevation */
+  --shadow-card: 0 1px 2px rgba(20, 20, 15, 0.04), 0 8px 24px rgba(20, 20, 15, 0.06);
+  --shadow-pop: 0 8px 40px rgba(20, 20, 15, 0.16);
+  --shadow-bar: 0 -6px 24px rgba(20, 20, 15, 0.08);
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+/* ============================================================
+   Base
+   ============================================================ */
+html,
+body {
+  background: #fbf7f0;
+}
+* {
+  -webkit-tap-highlight-color: transparent;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+/* hide scrollbars globally (clean, app-like) */
+::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* ============================================================
+   Motion + utilities
+   ============================================================ */
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
   }
 }
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: #ece3d4;
+}
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.55), transparent);
+  animation: shimmer 1.4s infinite;
+}
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.fade-up {
+  animation: fadeUp 0.34s cubic-bezier(0.2, 0.7, 0.3, 1) both;
+}
+
+@keyframes popIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.pop-in {
+  animation: popIn 0.26s cubic-bezier(0.2, 0.8, 0.3, 1) both;
+}
+
+@keyframes sheetUp {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: none;
+  }
+}
+.sheet-up {
+  animation: sheetUp 0.32s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+.grain {
+  background-image: radial-gradient(rgba(20, 64, 47, 0.04) 1px, transparent 1px);
+  background-size: 14px 14px;
 }

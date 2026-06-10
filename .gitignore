@@ -32,6 +32,11 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.example
+
+# maskan local (logs, design handoff reference)
+dev.log
+_design/
 
 # vercel
 .vercel

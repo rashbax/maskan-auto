@@ -1,0 +1,225 @@
+"use client";
+import { useState, useEffect } from "react";
+import { MASKAN } from "./data";
+import { Icon, Logo, Button, Chip, Badge, Stars, Photo, Sk, Stepper, Sheet, ChannelBtn } from "./ui";
+import { AvailabilityCalendar, nightsBetween, calMonths } from "./calendar";
+import { NavLinks } from "./account";
+
+export function fmtRange(from, to, lang) {
+  if (!from) return null;
+  const mon = calMonths[lang].map((m) => m.slice(0, 3));
+  const f = `${from.getDate()} ${mon[from.getMonth()]}`;
+  if (!to) return f;
+  return `${from.getDate()}–${to.getDate()} ${mon[to.getMonth()]}`;
+}
+
+// --- one catalog card ---
+export function AptCard({ apt, lang, STR, filters, onOpen, device, saved, onToggleSave }) {
+  const M = MASKAN;
+  const d = M.DISTRICTS[apt.district];
+  const nights = filters?.range?.from && filters?.range?.to ? nightsBetween(filters.range.from, filters.range.to) : 0;
+  const fav = !!saved;
+  return (
+    <div role="button" tabIndex={0} onClick={() => onOpen(apt)} onKeyDown={(e) => e.key === "Enter" && onOpen(apt)} className="group text-left w-full fade-up cursor-pointer">
+      <div className="relative aspect-[4/3] rounded-2xl overflow-hidden shadow-card">
+        <Photo tone={apt.tone} idx={apt.id.charCodeAt(1)} label="apartment photo" className="w-full h-full group-hover:scale-[1.03] transition-transform duration-500" />
+        <div className="absolute top-3 left-3 flex gap-2">
+          {apt.superhost && <Badge tone="cream" icon="shield">{STR[lang].superhost}</Badge>}
+          {d.centre && <Badge tone="ink">{STR[lang].centre}</Badge>}
+        </div>
+        <button onClick={(e) => { e.stopPropagation(); onToggleSave && onToggleSave(apt.id); }}
+          className="absolute top-3 right-3 w-9 h-9 grid place-items-center rounded-full bg-white/90 backdrop-blur hover:scale-110 transition-transform">
+          <Icon name="heart" size={18} fill={fav ? "#1B5E40" : "none"} className={fav ? "text-green-600" : "text-ink"} sw={1.8} /></button>
+        <div className="absolute bottom-3 left-3">
+          <span className="inline-flex items-baseline gap-1 px-3 h-9 rounded-full bg-white/94 backdrop-blur font-bold text-ink shadow-sm">
+            <span className="text-[16px] tnum">${apt.price}</span><span className="text-[12px] font-semibold text-inksoft">/{STR[lang].night1}</span>
+          </span>
+        </div>
+      </div>
+      <div className="pt-3 px-0.5">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-[11px] font-bold tracking-[0.12em] uppercase text-green-700">{d[lang]}</span>
+          <Stars rating={apt.rating} lang={lang} STR={STR} />
+        </div>
+        <h3 className="font-serif text-[18px] leading-snug mt-1 text-ink" style={{ textWrap: "balance" }}>{apt.title[lang]}</h3>
+        <div className="flex items-center gap-2 mt-1.5 text-[13px] text-inksoft font-medium">
+          <Icon name="pin" size={14} /><span>{apt.near[lang]}</span>
+          <span className="text-line">·</span><span>{STR[lang].sleeps(apt.sleeps)}</span>
+        </div>
+        {nights > 0 && (
+          <div className="mt-2.5 inline-flex items-center gap-1.5 text-[13px] font-semibold text-green-700 bg-green-50 px-2.5 py-1 rounded-lg">
+            <Icon name="check" size={14} sw={2.2} />${apt.price * nights} · {STR[lang].night_n(nights)}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function CardSkeleton() {
+  return (
+    <div>
+      <Sk className="aspect-[4/3] w-full" rounded="rounded-2xl" />
+      <div className="pt-3 space-y-2">
+        <Sk className="h-3 w-24" rounded="rounded-full" />
+        <Sk className="h-5 w-4/5" rounded="rounded-md" />
+        <Sk className="h-3 w-3/5" rounded="rounded-full" />
+      </div>
+    </div>
+  );
+}
+
+// --- filter sheet content (dates, guests, district) ---
+function FilterControls({ lang, STR, filters, setFilters, device }) {
+  return (
+    <div className="space-y-7">
+      <div>
+        <div className="text-[12px] font-bold tracking-wide uppercase text-inksoft mb-3">{STR[lang].stay}</div>
+        <AvailabilityCalendar lang={lang} STR={STR} busy={new Set()} value={filters.range} onChange={(r) => setFilters({ ...filters, range: r })} months={device === "desktop" ? 2 : 1} />
+      </div>
+      <div className="flex items-center justify-between border-t border-line pt-5">
+        <div>
+          <div className="font-serif text-[17px]">{STR[lang].guests}</div>
+          <div className="text-[13px] text-inksoft">{STR[lang].guest_n(filters.guests)}</div>
+        </div>
+        <Stepper value={filters.guests} min={1} max={10} onChange={(g) => setFilters({ ...filters, guests: g })} />
+      </div>
+    </div>
+  );
+}
+
+function DistrictRow({ lang, STR, filters, setFilters }) {
+  const M = MASKAN;
+  const ds = Object.keys(M.DISTRICTS);
+  return (
+    <div className="flex gap-2 overflow-x-auto no-scrollbar -mx-1 px-1 py-1">
+      <Chip active={!filters.district} onClick={() => setFilters({ ...filters, district: null })}>{STR[lang].all_districts}</Chip>
+      {ds.map((k) => (
+        <Chip key={k} active={filters.district === k} onClick={() => setFilters({ ...filters, district: filters.district === k ? null : k })} icon={M.DISTRICTS[k].centre ? "pin" : undefined}>
+          {M.DISTRICTS[k][lang]}</Chip>
+      ))}
+    </div>
+  );
+}
+
+export function Catalog({ lang, STR, apartments, filters, setFilters, onOpen, device, openLang, saved, toggleSave, tab, setTab }) {
+  const M = MASKAN;
+  const [loading, setLoading] = useState(true);
+  const [errored, setErrored] = useState(false);
+  const [showFilter, setShowFilter] = useState(false);
+  useEffect(() => { setLoading(true); const t = setTimeout(() => setLoading(false), 850); return () => clearTimeout(t); }, [filters.range, filters.district, filters.guests]);
+
+  const isLoading = loading || apartments == null;
+  const list = (apartments || []).filter((a) => {
+    if (filters.district && a.district !== filters.district) return false;
+    if (filters.guests && a.sleeps < filters.guests) return false;
+    if (filters.range?.from && filters.range?.to) {
+      for (let x = new Date(filters.range.from); x < filters.range.to; x = M.addDays(x, 1)) if (a.busy.has(M.iso(x))) return false;
+    }
+    return true;
+  });
+
+  const rangeLabel = fmtRange(filters.range?.from, filters.range?.to, lang);
+  const desktop = device === "desktop";
+
+  return (
+    <div className="min-h-screen bg-canvas">
+      {/* header */}
+      <header className={`sticky top-0 z-30 bg-canvas/90 backdrop-blur border-b border-line ${desktop ? "px-8" : "px-4"}`}>
+        <div className={`flex items-center justify-between ${desktop ? "h-[68px] max-w-6xl mx-auto" : "h-14"}`}>
+          <Logo size={desktop ? 32 : 28} />
+          {desktop && <NavLinks tab={tab} setTab={setTab} lang={lang} STR={STR} />}
+          <div className="flex items-center gap-1.5">
+            <button onClick={openLang} className="inline-flex items-center gap-1.5 h-9 px-3 rounded-full border border-line text-[13px] font-bold hover:border-ink/30 transition">
+              <Icon name="globe" size={16} />{STR[lang].code}</button>
+          </div>
+        </div>
+      </header>
+
+      <div className={`${desktop ? "max-w-6xl mx-auto px-8" : "px-4"}`}>
+        {/* hero + search */}
+        <div className={`${desktop ? "pt-10 pb-6" : "pt-6 pb-3"}`}>
+          <h1 className={`font-serif ${desktop ? "text-[40px]" : "text-[28px]"} leading-[1.06] tracking-tight`} style={{ textWrap: "balance" }}>
+            {lang === "ru" ? "Квартиры посуточно в Ташкенте" : lang === "uz" ? "Toshkentda kunlik kvartiralar" : "Daily apartments in Tashkent"}
+          </h1>
+          <p className={`text-inksoft mt-2 ${desktop ? "text-[16px]" : "text-[14px]"} max-w-lg`}>
+            {lang === "ru" ? "Реальные фото, честная цена, мгновенное бронирование. Без звонков и переписки." : lang === "uz" ? "Haqiqiy rasmlar, halol narx, lahzada band qilish. Qoʻngʻiroqlarsiz." : "Real photos, honest prices, instant booking. No calls, no chasing."}
+          </p>
+        </div>
+
+        {/* search bar */}
+        <button onClick={() => setShowFilter(true)} className={`w-full flex items-center gap-3 ${desktop ? "h-16 px-6 rounded-2xl" : "h-14 px-4 rounded-2xl"} bg-white border border-line shadow-card hover:shadow-pop transition-shadow text-left`}>
+          <Icon name="search" size={20} className="text-green-700 shrink-0" />
+          <div className="flex-1 min-w-0">
+            <div className="text-[14px] font-bold truncate">{STR[lang].search_city}{rangeLabel ? ` · ${rangeLabel}` : ""}</div>
+            <div className="text-[12.5px] text-inksoft truncate">{rangeLabel ? STR[lang].guest_n(filters.guests) : STR[lang].anydates + " · " + STR[lang].guest_n(filters.guests)}</div>
+          </div>
+          <span className="shrink-0 w-10 h-10 grid place-items-center rounded-xl bg-green-700 text-cream"><Icon name="sliders" size={18} /></span>
+        </button>
+
+        {/* districts */}
+        <div className="mt-4"><DistrictRow lang={lang} STR={STR} filters={filters} setFilters={setFilters} /></div>
+
+        {/* results */}
+        <div className="mt-5 pb-3">
+          {!isLoading && !errored && (
+            <div className="flex items-center justify-between mb-4">
+              <span className="text-[13.5px] font-semibold text-inksoft">{list.length} {lang === "ru" ? "вариантов" : lang === "uz" ? "variant" : "places"}{rangeLabel ? " · " + rangeLabel : ""}</span>
+            </div>
+          )}
+
+          {errored ? (
+            <StateBlock icon="bolt" title={STR[lang].error_title} sub={STR[lang].error_sub} action={STR[lang].retry} onAction={() => { setErrored(false); setLoading(true); setTimeout(() => setLoading(false), 700); }} />
+          ) : isLoading ? (
+            <div className={`grid gap-x-6 gap-y-8 ${desktop ? "grid-cols-3" : "grid-cols-1"}`}>
+              {Array.from({ length: desktop ? 6 : 3 }).map((_, i) => <CardSkeleton key={i} />)}
+            </div>
+          ) : list.length === 0 ? (
+            <StateBlock icon="search" title={STR[lang].no_results} sub={STR[lang].no_results_sub} action={STR[lang].reset} onAction={() => setFilters({ range: { from: null, to: null }, guests: 1, district: null })} />
+          ) : (
+            <div className={`grid gap-x-6 gap-y-8 ${desktop ? "grid-cols-3" : "grid-cols-1"}`}>
+              {list.map((a) => <AptCard key={a.id} apt={a} lang={lang} STR={STR} filters={filters} onOpen={onOpen} device={device} saved={saved && saved.has(a.id)} onToggleSave={toggleSave} />)}
+            </div>
+          )}
+        </div>
+
+        {/* help / footer */}
+        <footer className={`mt-2 ${desktop ? "pb-12" : "pb-24"}`}>
+          <div className="rounded-3xl bg-cream border border-line p-6 sm:p-7">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-5">
+              <div>
+                <div className="text-[11px] font-bold tracking-[0.14em] uppercase text-green-700 mb-1.5">{STR[lang].help_contact}</div>
+                <h3 className="font-serif text-[20px] leading-snug max-w-xs">{STR[lang].questions_title}</h3>
+                <p className="text-[13px] text-inksoft mt-1 max-w-sm">{STR[lang].questions_sub}</p>
+              </div>
+              <div className="flex flex-col gap-2.5 sm:w-60 shrink-0">
+                <ChannelBtn channel="whatsapp" lang={lang} STR={STR} variant="solid" full />
+                <ChannelBtn channel="telegram" lang={lang} STR={STR} variant="outline" full />
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center justify-between mt-6 px-1">
+            <Logo size={24} />
+            <span className="text-[12px] text-inksoft">© 2026 Maskan</span>
+          </div>
+        </footer>
+      </div>
+
+      <Sheet open={showFilter} onClose={() => setShowFilter(false)} title={STR[lang].filters} desktop={desktop}
+        footer={<Button full size="lg" onClick={() => setShowFilter(false)}>{STR[lang].apply}</Button>}>
+        <FilterControls lang={lang} STR={STR} filters={filters} setFilters={setFilters} device={device} />
+      </Sheet>
+    </div>
+  );
+}
+
+export function StateBlock({ icon, title, sub, action, onAction }) {
+  return (
+    <div className="py-16 flex flex-col items-center text-center fade-up">
+      <div className="w-16 h-16 rounded-2xl bg-green-50 grid place-items-center text-green-700 mb-4"><Icon name={icon} size={28} /></div>
+      <div className="font-serif text-[22px]">{title}</div>
+      <p className="text-inksoft text-[14px] mt-1.5 max-w-xs">{sub}</p>
+      {action && <div className="mt-5"><Button variant="outline" onClick={onAction}>{action}</Button></div>}
+    </div>
+  );
+}
