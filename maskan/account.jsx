@@ -182,7 +182,7 @@ export function BookingsPage({ lang, STR, device, tab, setTab, openLang, auth, o
 export function AccountPage({ lang, STR, device, tab, setTab, openLang, auth, onLogin, onLogout }) {
   return (
     <PageShell lang={lang} STR={STR} device={device} tab={tab} setTab={setTab} openLang={openLang} title={STR[lang].account_title}>
-      <div className="max-w-md">
+      <div className="max-w-md mx-auto">
         {auth ? (
           <div className="fade-up">
             <div className="flex items-center gap-4 rounded-2xl border border-line bg-white p-5">
