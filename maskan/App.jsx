@@ -8,7 +8,7 @@ import { Booking } from "./booking";
 import { SavedPage, BookingsPage, AccountPage, BottomNav } from "./account";
 import { Admin } from "./admin";
 import { getApartments, getFavorites, getMyBookings, addFavorite, removeFavorite } from "./db";
-import { sb, mapUser, signInWithGoogle, signOut } from "./auth";
+import { sb, mapUser, signInWithGoogle, signInWithTelegram, signOut } from "./auth";
 
 const LANGS = ["uz", "ru", "en"];
 
@@ -84,7 +84,7 @@ export default function App() {
     return n;
   });
   const login = (provider) => {
-    if (provider === "telegram") { alert("Telegram bilan kirish keyingi qadamda — hozircha Google bilan kiring."); return; }
+    if (provider === "telegram") { signInWithTelegram(); return; }
     signInWithGoogle();
   };
   const logout = () => signOut();

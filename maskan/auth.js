@@ -33,3 +33,36 @@ export async function signInWithGoogle() {
 export async function signOut() {
   return sb().auth.signOut();
 }
+
+// ---------- Telegram login (widget -> /api/auth/telegram -> Supabase session) ----------
+const TG_BOT_ID = "8834021236";
+
+function telegramAuth() {
+  return new Promise((resolve) => {
+    const trigger = () =>
+      window.Telegram.Login.auth({ bot_id: TG_BOT_ID, request_access: "write" }, (data) => resolve(data || null));
+    if (window.Telegram?.Login) return trigger();
+    const s = document.createElement("script");
+    s.src = "https://telegram.org/js/telegram-widget.js?22";
+    s.async = true;
+    s.onload = trigger;
+    s.onerror = () => resolve(null);
+    document.body.appendChild(s);
+  });
+}
+
+export async function signInWithTelegram() {
+  const data = await telegramAuth();
+  if (!data) return { error: "cancelled" };
+  const res = await fetch("/api/auth/telegram", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ...data, redirectTo: window.location.origin }),
+  });
+  const j = await res.json().catch(() => ({}));
+  if (res.ok && j.url) {
+    window.location.href = j.url; // Supabase verifies + redirects back signed-in
+    return {};
+  }
+  return { error: j.error || "failed" };
+}
