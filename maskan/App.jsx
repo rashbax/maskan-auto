@@ -101,7 +101,7 @@ export default function App() {
   const common = { lang, STR, device, openLang, tab: navTab, setTab };
   let screen;
   if (route.screen === "catalog") screen = <Catalog {...common} apartments={apartments} filters={filters} setFilters={setFilters} onOpen={openApt} saved={saved} toggleSave={toggleSave} />;
-  else if (route.screen === "detail") screen = <Detail {...common} apt={route.apt} range={range} setRange={setRange} onBack={goCatalog} onBook={book} saved={saved} toggleSave={toggleSave} />;
+  else if (route.screen === "detail") screen = <Detail {...common} apt={route.apt} range={range} setRange={setRange} onBack={goCatalog} onBook={book} saved={saved} toggleSave={toggleSave} auth={auth} onLogin={login} />;
   else if (route.screen === "booking") screen = <Booking {...common} apt={route.apt} range={range} onBack={() => setRoute({ screen: "detail", apt: route.apt })} onHome={goCatalog} onBooked={handleBooked} />;
   else if (route.screen === "saved") screen = <SavedPage {...common} apartments={apartments} saved={saved} toggleSave={toggleSave} onOpen={openApt} auth={auth} onLogin={login} />;
   else if (route.screen === "bookings") screen = <BookingsPage {...common} auth={auth} onLogin={login} onOpen={openApt} onBookAgain={openApt} bookings={myBookings} apartments={apartments} />;

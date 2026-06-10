@@ -1,8 +1,9 @@
 "use client";
 import { useState } from "react";
 import { MASKAN } from "./data";
-import { Icon, Button, Sheet } from "./ui";
+import { Icon, Button, Sheet, GoogleG } from "./ui";
 import { calMonths } from "./calendar";
+import { submitReview } from "./db";
 
 // display N filled stars out of 5
 export function StarRow({ value, size = 15 }) {
@@ -58,18 +59,28 @@ function ReviewCard({ r, lang, STR }) {
   );
 }
 
-function ReviewForm({ lang, STR, onSubmit }) {
+function ReviewForm({ lang, STR, onSubmit, auth, onLogin, apartmentId }) {
   const [rating, setRating] = useState(0);
   const [cons, setCons] = useState("");
   const [comment, setComment] = useState("");
   const [err, setErr] = useState(false);
   const [done, setDone] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
   const ta = "w-full px-4 py-3 rounded-xl bg-white border border-line text-[15px] outline-none focus:border-green-600 focus:ring-2 focus:ring-green-600/15 transition placeholder:text-inksoft/50 resize-none";
 
-  function submit() {
+  async function submit() {
     if (!rating) { setErr(true); return; }
-    onSubmit({ name: lang === "ru" ? "Вы" : lang === "uz" ? "Siz" : "You", country: STR[lang].code, rating, cons: cons.trim(), text: comment.trim() || (lang === "ru" ? "Спасибо, всё понравилось!" : lang === "uz" ? "Rahmat, hammasi yoqdi!" : "Thanks, enjoyed the stay!"), date: MASKAN.iso(MASKAN.TODAY) });
-    setDone(true);
+    setBusy(true); setMsg("");
+    const text = comment.trim() || (lang === "ru" ? "Спасибо, всё понравилось!" : lang === "uz" ? "Rahmat, hammasi yoqdi!" : "Thanks, enjoyed the stay!");
+    const res = await submitReview({ apartmentId, rating, cons: cons.trim(), text, name: auth?.name, country: STR[lang].code });
+    setBusy(false);
+    if (res.ok) {
+      onSubmit({ name: auth?.name || (lang === "ru" ? "Вы" : lang === "uz" ? "Siz" : "You"), country: STR[lang].code, rating, cons: cons.trim(), text, date: MASKAN.iso(MASKAN.TODAY) });
+      setDone(true);
+    } else {
+      setMsg(res.error === "not_eligible" ? "not_eligible" : "fail");
+    }
   }
 
   if (done) return (
@@ -77,6 +88,17 @@ function ReviewForm({ lang, STR, onSubmit }) {
       <div className="w-16 h-16 rounded-full bg-green-700 text-cream grid place-items-center mx-auto pop-in"><Icon name="check" size={34} sw={2.4} /></div>
       <h3 className="font-serif text-[22px] mt-4">{STR[lang].review_thanks}</h3>
       <p className="text-inksoft text-[14px] mt-1.5 max-w-xs mx-auto">{STR[lang].review_thanks_sub}</p>
+    </div>
+  );
+
+  if (!auth) return (
+    <div className="py-8 text-center fade-up">
+      <div className="w-14 h-14 rounded-2xl bg-green-50 grid place-items-center text-green-700 mx-auto mb-3"><Icon name="lock" size={26} /></div>
+      <p className="text-[14px] text-inksoft mb-5 max-w-xs mx-auto">{lang === "ru" ? "Войдите, чтобы оставить отзыв." : lang === "uz" ? "Sharh qoldirish uchun tizimga kiring." : "Sign in to leave a review."}</p>
+      <div className="space-y-2.5 max-w-xs mx-auto">
+        <button onClick={() => onLogin("telegram")} className="inline-flex items-center justify-center gap-2.5 w-full rounded-full bg-green-700 text-cream font-semibold text-[14.5px] hover:bg-green-900 transition" style={{ height: 48 }}><Icon name="tg" size={19} />{STR[lang].login_telegram}</button>
+        <button onClick={() => onLogin("google")} className="inline-flex items-center justify-center gap-2.5 w-full rounded-full bg-white border border-line text-ink font-semibold text-[14.5px] hover:border-ink/30 transition" style={{ height: 48 }}><GoogleG size={18} />{STR[lang].login_google}</button>
+      </div>
     </div>
   );
 
@@ -102,14 +124,15 @@ function ReviewForm({ lang, STR, onSubmit }) {
         <textarea rows={3} value={comment} onChange={(e) => setComment(e.target.value)} placeholder={STR[lang].comment_ph} className={ta + " mt-1.5"} />
       </label>
 
+      {msg && <div className="text-[13px] text-[#9a4a3c] bg-red-50 rounded-lg p-3 mt-4">{msg === "not_eligible" ? (lang === "ru" ? "Отзыв можно оставить только после проживания." : lang === "uz" ? "Sharhni faqat turib ketgandan keyin qoldirasiz." : "You can review only after your stay.") : (lang === "ru" ? "Не удалось отправить." : lang === "uz" ? "Yuborib boʻlmadi." : "Could not submit.")}</div>}
       <div className="sticky bottom-0 -mx-5 px-5 pt-3 pb-1 bg-canvas mt-5">
-        <Button full size="lg" icon="check" onClick={submit}>{STR[lang].submit_review}</Button>
+        <Button full size="lg" icon="check" onClick={submit} disabled={busy} className={busy ? "opacity-60 pointer-events-none" : ""}>{busy ? "…" : STR[lang].submit_review}</Button>
       </div>
     </div>
   );
 }
 
-export function ReviewsSection({ apt, lang, STR, device }) {
+export function ReviewsSection({ apt, lang, STR, device, auth, onLogin }) {
   const [list, setList] = useState(apt.reviewsList);
   const [open, setOpen] = useState(false);
   const avg = list.length ? (list.reduce((s, r) => s + r.rating, 0) / list.length) : apt.rating;
@@ -133,7 +156,7 @@ export function ReviewsSection({ apt, lang, STR, device }) {
       </div>
 
       <Sheet open={open} onClose={() => setOpen(false)} title={STR[lang].leave_review} desktop={device === "desktop"}>
-        <ReviewForm lang={lang} STR={STR} onSubmit={(rev) => setList([rev, ...list])} />
+        <ReviewForm lang={lang} STR={STR} onSubmit={(rev) => setList([rev, ...list])} auth={auth} onLogin={onLogin} apartmentId={apt.id} />
       </Sheet>
     </section>
   );

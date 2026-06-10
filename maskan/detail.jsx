@@ -103,7 +103,7 @@ function WhereBlock({ apt, lang, STR }) {
   );
 }
 
-export function Detail({ apt, lang, STR, device, range, setRange, onBack, onBook, openLang, saved, toggleSave }) {
+export function Detail({ apt, lang, STR, device, range, setRange, onBack, onBook, openLang, saved, toggleSave, auth, onLogin }) {
   const M = MASKAN;
   const isSaved = saved && saved.has(apt.id);
   const d = M.DISTRICTS[apt.district];
@@ -219,7 +219,7 @@ export function Detail({ apt, lang, STR, device, range, setRange, onBack, onBook
 
           <Section title={STR[lang].where}><WhereBlock apt={apt} lang={lang} STR={STR} /></Section>
 
-          <ReviewsSection apt={apt} lang={lang} STR={STR} device={device} />
+          <ReviewsSection apt={apt} lang={lang} STR={STR} device={device} auth={auth} onLogin={onLogin} />
 
           {/* questions — WhatsApp / Telegram */}
           <section className="py-6 border-t border-line">

@@ -238,6 +238,27 @@ export async function setReviewReply(id, reply) {
   await sb.from("review_audit").insert({ review_id: id, action: "reply", who: "admin" });
 }
 
+// ---------- guest: submit a review (RLS allows only post-stay guests) ----------
+export async function submitReview({ apartmentId, rating, cons, text, name, country }) {
+  const sb = createClient();
+  const { data: { user } } = await sb.auth.getUser();
+  if (!user) return { error: "not_logged_in" };
+  const { error } = await sb.from("reviews").insert({
+    apartment_id: apartmentId,
+    user_id: user.id,
+    name: name || "Mehmon",
+    country: country || "",
+    rating,
+    cons: cons || "",
+    text: text || "",
+  });
+  if (error) {
+    const rls = error.code === "42501" || /row-level/i.test(error.message || "");
+    return { error: rls ? "not_eligible" : "fail" };
+  }
+  return { ok: true };
+}
+
 // ---------- admin: create / update an apartment (text fields) ----------
 export async function saveApartment(row, address) {
   const sb = createClient();
