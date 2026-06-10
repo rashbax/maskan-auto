@@ -5,6 +5,7 @@ import { Icon, Logo, Button, Stars, Photo, Badge, Sheet, ChannelBtn, AMENITY_ICO
 import { AvailabilityCalendar, nightsBetween } from "./calendar";
 import { fmtRange } from "./catalog";
 import { ReviewsSection } from "./reviews";
+import { MapView } from "./maps";
 
 const GALLERY_LABELS = ["living room", "kitchen", "bedroom", "bathroom", "balcony", "view", "entrance", "workspace", "dining", "hallway"];
 
@@ -81,23 +82,29 @@ function PriceBreakdown({ apt, range, lang, STR }) {
   );
 }
 
-// ---- map / address-after-booking ----
+// ---- map: exact building shown; only the unit number stays private ----
 function WhereBlock({ apt, lang, STR }) {
   const M = MASKAN;
+  const has = apt.lat != null && apt.lng != null;
+  const label = apt.title?.[lang] || M.DISTRICTS[apt.district][lang];
+  const unitNote = lang === "ru"
+    ? "Здание показано на карте. Номер квартиры (этаж / подъезд) отправим после бронирования."
+    : lang === "en"
+      ? "The building is shown on the map. The apartment number (floor / entrance) is sent after you book."
+      : "Bino xaritada ko'rsatilgan. Kvartira raqami (qavat / kirish) bron qilingach yuboriladi.";
   return (
     <div>
-      <div className="relative h-44 rounded-2xl overflow-hidden border border-line grain bg-cream">
-        <div className="absolute inset-0" style={{ backgroundImage: "linear-gradient(0deg, rgba(20,64,47,.05) 1px, transparent 1px), linear-gradient(90deg, rgba(20,64,47,.05) 1px, transparent 1px)", backgroundSize: "26px 26px" }} />
-        {/* approximate area circle */}
-        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
-          <div className="w-32 h-32 rounded-full bg-green-600/12 border-2 border-dashed border-green-600/40" />
-          <div className="absolute inset-0 grid place-items-center"><div className="w-3 h-3 rounded-full bg-green-700 ring-4 ring-green-600/25" /></div>
+      {has ? (
+        <MapView lat={apt.lat} lng={apt.lng} label={label} lang={lang} />
+      ) : (
+        <div className="relative h-44 rounded-2xl overflow-hidden border border-line grain bg-cream">
+          <div className="absolute inset-0" style={{ backgroundImage: "linear-gradient(0deg, rgba(20,64,47,.05) 1px, transparent 1px), linear-gradient(90deg, rgba(20,64,47,.05) 1px, transparent 1px)", backgroundSize: "26px 26px" }} />
+          <div className="absolute bottom-3 left-3"><Badge tone="cream" icon="pin">{M.DISTRICTS[apt.district][lang]} · {STR[lang].search_city}</Badge></div>
         </div>
-        <div className="absolute bottom-3 left-3"><Badge tone="cream" icon="pin">{M.DISTRICTS[apt.district][lang]} · {STR[lang].search_city}</Badge></div>
-      </div>
+      )}
       <div className="flex gap-3 mt-3 p-3.5 rounded-xl bg-green-50">
         <Icon name="shield" size={20} className="text-green-700 shrink-0 mt-0.5" />
-        <p className="text-[13px] leading-relaxed text-green-900">{STR[lang].address_after}</p>
+        <p className="text-[13px] leading-relaxed text-green-900">{unitNote}</p>
       </div>
     </div>
   );

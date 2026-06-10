@@ -6,6 +6,7 @@ import { calMonths, calWD, buildMonth, dOnly } from "./calendar";
 import { fmtRange } from "./catalog";
 import { StarRow } from "./reviews";
 import { getApartments, getAllBookings, cancelBooking, createManualBooking, getBlocks, blockDay, unblockDay, getAllReviews, setReviewHidden, setReviewReply, saveApartment, deleteApartment, requestUploadUrl, addPhoto, getPhotos, deletePhoto } from "./db";
+import { MapPicker } from "./maps";
 
 const SRC = {
   website: { color: "#1B5E40", bg: "#EAF1EC", key: "src_website" },
@@ -222,7 +223,8 @@ function EditApt({ lang, STR, id, onBack, apartments, onSaved }) {
   const [size, setSize] = useState(apt ? apt.size : 40);
   const [district, setDistrict] = useState(apt ? apt.district : "mirobod");
   const [address, setAddress] = useState("");
-  const [pin, setPin] = useState({ x: 50, y: 48 });
+  const [lat, setLat] = useState(apt?.lat ?? null);
+  const [lng, setLng] = useState(apt?.lng ?? null);
   const allAmen = Object.keys(M.AMENITIES);
   const fld = "mt-1.5 w-full h-12 px-4 rounded-xl bg-white border border-line outline-none focus:border-green-600 focus:ring-2 focus:ring-green-600/15 transition text-[15px]";
   const langTabs = (
@@ -234,7 +236,7 @@ function EditApt({ lang, STR, id, onBack, apartments, onSaved }) {
   );
   function buildRow() {
     const nearI18n = apt?.near || { uz: "", ru: "", en: "" };
-    return { id: aptId, tone, price_usd: price, district, sleeps: guests, beds, baths, size_m2: size, title: titleI18n, blurb: blurbI18n, near: nearI18n, amenities: amen, photos_count: photos.length || count, status: "active" };
+    return { id: aptId, tone, price_usd: price, district, sleeps: guests, beds, baths, size_m2: size, lat, lng, title: titleI18n, blurb: blurbI18n, near: nearI18n, amenities: amen, photos_count: photos.length || count, status: "active" };
   }
   async function persistApartment() { await saveApartment(buildRow(), address); }
   async function save() {
@@ -342,16 +344,7 @@ function EditApt({ lang, STR, id, onBack, apartments, onSaved }) {
       {/* location pick + exact address */}
       <div className="mb-6">
         <div className="text-[13px] font-bold mb-2">{STR[lang].a_location}</div>
-        <div className="relative h-44 rounded-2xl overflow-hidden border border-line bg-cream cursor-crosshair select-none"
-          onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); setPin({ x: ((e.clientX - r.left) / r.width) * 100, y: ((e.clientY - r.top) / r.height) * 100 }); }}>
-          <div className="absolute inset-0" style={{ backgroundImage: "linear-gradient(0deg, rgba(20,64,47,.06) 1px, transparent 1px), linear-gradient(90deg, rgba(20,64,47,.06) 1px, transparent 1px)", backgroundSize: "26px 26px" }} />
-          <div className="absolute" style={{ left: pin.x + "%", top: pin.y + "%", transform: "translate(-50%,-50%)" }}>
-            <div className="relative grid place-items-center">
-              <div className="w-24 h-24 rounded-full bg-green-600/12 border-2 border-dashed border-green-600/40" />
-              <div className="absolute w-4 h-4 rounded-full bg-green-700 ring-4 ring-green-600/25" />
-            </div>
-          </div>
-        </div>
+        <MapPicker lat={lat} lng={lng} onChange={(la, ln) => { setLat(la); setLng(ln); }} />
         <p className="text-[12px] text-inksoft mt-2">{STR[lang].a_location_help}</p>
 
         <label className="block mt-4">
