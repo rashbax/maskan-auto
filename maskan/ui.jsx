@@ -194,11 +194,11 @@ export const AMENITY_ICON = { wifi: "wifi", ac: "ac", kitchen: "kitchen", washer
 
 // ---------------- Contact channel button (WhatsApp / Telegram) ----------------
 export const waHref = (text) => `https://wa.me/${MASKAN.CONTACT.wa}${text ? `?text=${encodeURIComponent(text)}` : ""}`;
-export const tgHref = () => `https://t.me/${MASKAN.CONTACT.tg}`;
+export const tgHref = (start) => `https://t.me/${MASKAN.CONTACT.tg}${start ? `?start=${start}` : ""}`;
 
-export function ChannelBtn({ channel, lang, STR, variant = "outline", full, size = "md", text, children }) {
+export function ChannelBtn({ channel, lang, STR, variant = "outline", full, size = "md", text, tgStart, children }) {
   const isWa = channel === "whatsapp";
-  const href = isWa ? waHref(text) : tgHref();
+  const href = isWa ? waHref(text) : tgHref(tgStart);
   const label = children || (isWa ? STR[lang].chat_whatsapp : STR[lang].chat_telegram);
   const sizes = { sm: "h-10 px-4 text-[13.5px]", md: "h-12 px-5 text-[15px]", lg: "h-14 px-6 text-[16px]" };
   const variants = {

@@ -349,5 +349,5 @@ const STR = {
 
 export const MASKAN = {
   TODAY, iso, addDays, APARTMENTS, BOOKINGS, GUEST_BOOKINGS, AMENITIES, DISTRICTS, TONES, STR,
-  CONTACT: { wa: "998901234567", tg: "maskan_tashkent" },
+  CONTACT: { wa: "998901234567", tg: "maskan_tashkentbot" },
 };
