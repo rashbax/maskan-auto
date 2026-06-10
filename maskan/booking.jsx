@@ -175,7 +175,7 @@ export function Booking({ apt, range, lang, STR, device, onBack, onHome, onBooke
             <Field label={STR[lang].tg_optional} help={STR[lang].tg_help}>
               <div className="relative">
                 <span className="absolute left-4 top-1/2 -translate-y-1/2 text-inksoft"><Icon name="tg" size={18} /></span>
-                <input className={inputCls + " pl-11"} placeholder="@username" value={form.tg} onChange={(e) => setForm({ ...form, tg: e.target.value })} />
+                <input className={inputCls + " pl-11"} placeholder="@username" value={form.tg} onChange={(e) => { const raw = e.target.value.replace(/^@+/, ""); setForm({ ...form, tg: raw ? "@" + raw : "" }); }} />
               </div>
             </Field>
           </div>

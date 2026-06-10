@@ -89,6 +89,8 @@ export default function App() {
   };
   const logout = () => signOut();
   const refreshApartments = () => getApartments().then(setApartments).catch(() => {});
+  const refreshMyBookings = () => getMyBookings().then(setMyBookings).catch(() => {});
+  const handleBooked = () => { refreshApartments(); refreshMyBookings(); };
 
   const GUEST_TABS = ["catalog", "saved", "bookings", "account"];
   const navTab = ["detail", "booking"].includes(route.screen) ? "search" : route.screen === "catalog" ? "search" : route.screen;
@@ -98,7 +100,7 @@ export default function App() {
   let screen;
   if (route.screen === "catalog") screen = <Catalog {...common} apartments={apartments} filters={filters} setFilters={setFilters} onOpen={openApt} saved={saved} toggleSave={toggleSave} />;
   else if (route.screen === "detail") screen = <Detail {...common} apt={route.apt} range={range} setRange={setRange} onBack={goCatalog} onBook={book} saved={saved} toggleSave={toggleSave} />;
-  else if (route.screen === "booking") screen = <Booking {...common} apt={route.apt} range={range} onBack={() => setRoute({ screen: "detail", apt: route.apt })} onHome={goCatalog} onBooked={refreshApartments} />;
+  else if (route.screen === "booking") screen = <Booking {...common} apt={route.apt} range={range} onBack={() => setRoute({ screen: "detail", apt: route.apt })} onHome={goCatalog} onBooked={handleBooked} />;
   else if (route.screen === "saved") screen = <SavedPage {...common} apartments={apartments} saved={saved} toggleSave={toggleSave} onOpen={openApt} auth={auth} onLogin={login} />;
   else if (route.screen === "bookings") screen = <BookingsPage {...common} auth={auth} onLogin={login} onOpen={openApt} onBookAgain={openApt} bookings={myBookings} apartments={apartments} />;
   else if (route.screen === "account") screen = <AccountPage {...common} auth={auth} onLogin={login} onLogout={logout} setLang={setLang} />;
