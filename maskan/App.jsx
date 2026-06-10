@@ -118,8 +118,8 @@ export default function App() {
 
       <LangSheet open={langOpen} onClose={() => setLangOpen(false)} lang={lang} setLang={setLang} STR={STR} desktop={desktop} />
 
-      {/* Discreet admin entry (prototype only — real admin lives on admin.maskan.uz) */}
-      {route.screen !== "admin" && (
+      {/* Admin entry — only visible to a signed-in admin (hidden from guests) */}
+      {role === "admin" && route.screen !== "admin" && (
         <button onClick={goAdmin}
           className="fixed left-3 bottom-[76px] sm:bottom-3 z-30 inline-flex items-center gap-1 h-7 px-2.5 rounded-full bg-white/70 backdrop-blur border border-line text-[11px] font-semibold text-inksoft/70 hover:text-ink hover:border-ink/30 transition">
           <Icon name="lock" size={12} />admin
