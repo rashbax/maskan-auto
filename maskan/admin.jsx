@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, createRef } from "react";
 import { MASKAN } from "./data";
-import { Icon, Logo, Button, Chip, Badge, Photo, Stepper, AMENITY_ICON } from "./ui";
+import { Icon, Logo, Button, Chip, Badge, Photo, Stepper, AMENITY_ICON, GoogleG } from "./ui";
 import { calMonths, calWD, buildMonth, dOnly } from "./calendar";
 import { fmtRange } from "./catalog";
 import { StarRow } from "./reviews";
@@ -473,15 +473,37 @@ function ReviewsModeration({ lang, STR }) {
   );
 }
 
-export function Admin({ lang, STR, device, onExit, openLang }) {
-  const [auth, setAuth] = useState(false);
+// ---- login gate (real Supabase auth; admin role required) ----
+function AdminGate({ lang, STR, onLogin, onExit }) {
+  return (
+    <div className="min-h-screen bg-canvas grid place-items-center px-5">
+      <div className="w-full max-w-sm fade-up">
+        <div className="flex justify-center mb-6"><Logo size={40} /></div>
+        <div className="rounded-3xl border border-line bg-white p-7 shadow-card">
+          <div className="flex items-center justify-center gap-1.5 mb-1"><Icon name="lock" size={15} className="text-green-700" /><span className="text-[11px] font-bold tracking-[0.12em] uppercase text-green-700">{STR[lang].a_secure}</span></div>
+          <h1 className="font-serif text-[23px] text-center">{STR[lang].admin_login}</h1>
+          <p className="text-[13px] text-inksoft text-center mt-1 mb-6">admin.maskan.uz</p>
+          <div className="space-y-2.5">
+            <button onClick={() => onLogin("google")} className="inline-flex items-center justify-center gap-2.5 w-full rounded-full bg-white border border-line text-ink font-semibold text-[15px] hover:border-ink/30 transition" style={{ height: 52 }}>
+              <GoogleG size={19} />{STR[lang].login_google}</button>
+            <button onClick={() => onLogin("telegram")} className="inline-flex items-center justify-center gap-2.5 w-full rounded-full bg-green-700 text-cream font-semibold text-[15px] hover:bg-green-900 transition" style={{ height: 52 }}>
+              <Icon name="tg" size={20} />{STR[lang].login_telegram}</button>
+          </div>
+          <p className="text-[12px] text-inksoft text-center mt-4">{lang === "ru" ? "Войдите аккаунтом администратора." : lang === "uz" ? "Administrator akkaunti bilan kiring." : "Sign in with an admin account."}</p>
+        </div>
+        <button onClick={onExit} className="block mx-auto mt-4 text-[12.5px] font-semibold text-inksoft hover:text-ink">← {STR[lang].catalog}</button>
+      </div>
+    </div>
+  );
+}
+
+export function Admin({ lang, STR, device, onExit, openLang, role, auth, onLogin }) {
   const [tab, setTab] = useState("dash");
   const [editId, setEditId] = useState(null);
-  const [showAlert, setShowAlert] = useState(false);
-  function handleLogin() { setAuth(true); setShowAlert(true); }
-  useEffect(() => { if (showAlert) { const t = setTimeout(() => setShowAlert(false), 5200); return () => clearTimeout(t); } }, [showAlert]);
 
-  if (!auth) return <AdminLogin lang={lang} STR={STR} onLogin={handleLogin} onExit={onExit} />;
+  if (!auth) return <AdminGate lang={lang} STR={STR} onLogin={onLogin} onExit={onExit} />;
+  if (role == null) return <div className="min-h-screen bg-canvas grid place-items-center"><div className="w-10 h-10 rounded-full border-[3px] border-green-600/25 border-t-green-700 animate-spin" /></div>;
+  if (role !== "admin") return <Admin404 lang={lang} STR={STR} onBack={onExit} />;
 
   const nav = [
     { k: "dash", label: STR[lang].a_dashboard, icon: "grid" },
@@ -494,7 +516,6 @@ export function Admin({ lang, STR, device, onExit, openLang }) {
 
   return (
     <div className="min-h-screen bg-canvas flex relative">
-      {showAlert && <LoginAlert lang={lang} STR={STR} onClose={() => setShowAlert(false)} />}
       {/* sidebar (desktop) */}
       <aside className="hidden md:flex w-60 shrink-0 flex-col border-r border-line bg-white px-4 py-5">
         <div className="px-2 mb-7"><Logo size={30} /></div>

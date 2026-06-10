@@ -7,7 +7,7 @@ import { Detail } from "./detail";
 import { Booking } from "./booking";
 import { SavedPage, BookingsPage, AccountPage, BottomNav } from "./account";
 import { Admin } from "./admin";
-import { getApartments, getFavorites, getMyBookings, addFavorite, removeFavorite } from "./db";
+import { getApartments, getFavorites, getMyBookings, addFavorite, removeFavorite, getMyRole } from "./db";
 import { sb, mapUser, signInWithGoogle, signInWithTelegram, signOut } from "./auth";
 
 const LANGS = ["uz", "ru", "en"];
@@ -41,6 +41,7 @@ export default function App() {
   const [auth, setAuth] = useState(null);
   const [apartments, setApartments] = useState(null); // null = loading; from Supabase
   const [myBookings, setMyBookings] = useState([]);
+  const [role, setRole] = useState(null);
 
   useEffect(() => {
     let alive = true;
@@ -60,9 +61,10 @@ export default function App() {
 
   // load this user's favorites + bookings when signed in (clear on sign out)
   useEffect(() => {
-    if (!auth) { setSaved(new Set()); setMyBookings([]); return; }
+    if (!auth) { setSaved(new Set()); setMyBookings([]); setRole(null); return; }
     getFavorites().then(setSaved);
     getMyBookings().then(setMyBookings);
+    getMyRole().then(setRole);
   }, [auth?.id]);
 
   useEffect(() => {
@@ -104,7 +106,7 @@ export default function App() {
   else if (route.screen === "saved") screen = <SavedPage {...common} apartments={apartments} saved={saved} toggleSave={toggleSave} onOpen={openApt} auth={auth} onLogin={login} />;
   else if (route.screen === "bookings") screen = <BookingsPage {...common} auth={auth} onLogin={login} onOpen={openApt} onBookAgain={openApt} bookings={myBookings} apartments={apartments} />;
   else if (route.screen === "account") screen = <AccountPage {...common} auth={auth} onLogin={login} onLogout={logout} setLang={setLang} />;
-  else if (route.screen === "admin") screen = <Admin {...common} onExit={goCatalog} />;
+  else if (route.screen === "admin") screen = <Admin {...common} onExit={goCatalog} role={role} auth={auth} onLogin={login} />;
 
   const desktop = device === "desktop";
   const showNav = GUEST_TABS.includes(route.screen);

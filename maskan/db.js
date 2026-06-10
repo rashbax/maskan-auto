@@ -130,3 +130,12 @@ export async function getMyBookings() {
     status: b.status === "checked-out" ? "past" : b.status,
   }));
 }
+
+// ---------- current user's role (guest | admin) ----------
+export async function getMyRole() {
+  const sb = createClient();
+  const { data: { user } } = await sb.auth.getUser();
+  if (!user) return null;
+  const { data } = await sb.from("profiles").select("role").eq("id", user.id).single();
+  return data?.role || "guest";
+}
