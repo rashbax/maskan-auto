@@ -269,3 +269,9 @@ export async function saveApartment(row, address) {
   }
   return row.id;
 }
+
+export async function deleteApartment(id) {
+  const sb = createClient();
+  const { error } = await sb.from("apartments").delete().eq("id", id);
+  if (error) throw error;
+}

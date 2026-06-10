@@ -5,7 +5,7 @@ import { Icon, Logo, Button, Chip, Badge, Photo, Stepper, AMENITY_ICON, GoogleG 
 import { calMonths, calWD, buildMonth, dOnly } from "./calendar";
 import { fmtRange } from "./catalog";
 import { StarRow } from "./reviews";
-import { getApartments, getAllBookings, cancelBooking, getBlocks, blockDay, unblockDay, getAllReviews, setReviewHidden, setReviewReply, saveApartment, requestUploadUrl, addPhoto, getPhotos, deletePhoto } from "./db";
+import { getApartments, getAllBookings, cancelBooking, getBlocks, blockDay, unblockDay, getAllReviews, setReviewHidden, setReviewReply, saveApartment, deleteApartment, requestUploadUrl, addPhoto, getPhotos, deletePhoto } from "./db";
 
 const SRC = {
   website: { color: "#1B5E40", bg: "#EAF1EC", key: "src_website" },
@@ -195,6 +195,13 @@ function EditApt({ lang, STR, id, onBack, apartments, onSaved }) {
     if (fileRef.current) fileRef.current.value = "";
   }
   async function removePhoto(p) { await deletePhoto(p.id); setPhotos(await getPhotos(aptId)); }
+  async function remove() {
+    const msg = lang === "ru" ? "Удалить квартиру и все её фото и брони?" : lang === "uz" ? "Kvartira va uning barcha rasm/bronlari oʻchirilsinmi?" : "Delete this apartment and all its photos/bookings?";
+    if (!window.confirm(msg)) return;
+    setSaving(true);
+    try { await deleteApartment(apt.id); if (onSaved) await onSaved(); onBack(); }
+    catch (e) { console.error("delete failed:", e); setSaving(false); }
+  }
   return (
     <div className="max-w-3xl">
       <button onClick={onBack} className="inline-flex items-center gap-1.5 text-[13.5px] font-semibold text-inksoft mb-4 hover:text-ink"><Icon name="arrowL" size={16} />{STR[lang].a_listings}</button>
@@ -279,7 +286,7 @@ function EditApt({ lang, STR, id, onBack, apartments, onSaved }) {
           {allAmen.map((a) => <Chip key={a} active={amen.includes(a)} icon={AMENITY_ICON[a]} onClick={() => setAmen(amen.includes(a) ? amen.filter((x) => x !== a) : [...amen, a])}>{M.AMENITIES[a][lang]}</Chip>)}
         </div>
       </div>
-      <div className="flex gap-3"><Button onClick={save} disabled={saving} className={saving ? "opacity-60 pointer-events-none" : ""}>{STR[lang].a_save}</Button><Button variant="ghost" onClick={onBack}>{STR[lang].back}</Button></div>
+      <div className="flex gap-3 items-center"><Button onClick={save} disabled={saving} className={saving ? "opacity-60 pointer-events-none" : ""}>{STR[lang].a_save}</Button><Button variant="ghost" onClick={onBack}>{STR[lang].back}</Button>{apt && <button onClick={remove} className="ml-auto inline-flex items-center gap-1.5 text-[13.5px] font-semibold text-[#9a4a3c] hover:bg-red-50 h-10 px-3 rounded-full"><Icon name="trash" size={16} />{lang === "ru" ? "Удалить" : lang === "uz" ? "Oʻchirish" : "Delete"}</button>}</div>
     </div>
   );
 }
