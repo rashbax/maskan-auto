@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { MASKAN } from "./data";
 import { Icon, Sheet } from "./ui";
 import { Catalog } from "./catalog";
@@ -74,19 +74,23 @@ export default function App() {
   }, []);
   useEffect(() => { window.scrollTo(0, 0); }, [route.screen, route.apt]);
 
-  // restore a top-level screen from the URL hash, so a refresh keeps you put (e.g. admin)
+  // restore a top-level screen from the URL hash, so a refresh keeps you put (e.g. admin).
+  // Admin appends its own sub-path (#admin/list), so match on the first hash segment.
   useEffect(() => {
-    const h = (window.location.hash || "").replace(/^#/, "");
-    if (["saved", "bookings", "account", "admin"].includes(h)) setRoute({ screen: h });
+    const top = (window.location.hash || "").replace(/^#/, "").split("/")[0];
+    if (["saved", "bookings", "account", "admin"].includes(top)) setRoute({ screen: top });
   }, []);
-  // keep the hash in sync with the current top-level screen (detail/booking carry an object → not hashable)
+  // keep the hash in sync with the current top-level screen (detail/booking carry an object → not
+  // hashable). Skip the first run and never clobber a deeper hash Admin already owns (#admin/list).
+  const hashSynced = useRef(false);
   useEffect(() => {
+    if (!hashSynced.current) { hashSynced.current = true; return; }
     const s = route.screen;
     if (!["catalog", "saved", "bookings", "account", "admin"].includes(s)) return;
+    const curTop = (window.location.hash || "").replace(/^#/, "").split("/")[0];
+    if (curTop === s) return;
     const want = s === "catalog" ? "" : "#" + s;
-    if (window.location.hash !== want) {
-      window.history.replaceState(null, "", want || window.location.pathname + window.location.search);
-    }
+    window.history.replaceState(null, "", want || window.location.pathname + window.location.search);
   }, [route.screen]);
 
   const openLang = () => setLangOpen(true);

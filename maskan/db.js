@@ -102,6 +102,14 @@ export async function deletePhoto(id) {
   await sb.from("apartment_photos").delete().eq("id", id);
 }
 
+// persist a new photo order — items: [{ id, sort, is_cover }] (first = cover)
+export async function setPhotoOrder(items) {
+  const sb = createClient();
+  await Promise.all(
+    items.map((it) => sb.from("apartment_photos").update({ sort: it.sort, is_cover: !!it.is_cover }).eq("id", it.id))
+  );
+}
+
 // Create an instant booking. Access codes are NOT auto-sent — the host contacts
 // the guest (via the contact left here) to hand over keys at check-in.
 export async function createBooking({ apartmentId, guestName, phone, telegram, messenger, from, to, price }) {

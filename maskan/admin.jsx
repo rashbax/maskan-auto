@@ -5,7 +5,7 @@ import { Icon, Logo, Button, Chip, Badge, Photo, Stepper, AMENITY_ICON, GoogleG,
 import { calMonths, calWD, buildMonth, dOnly } from "./calendar";
 import { fmtRange } from "./catalog";
 import { StarRow } from "./reviews";
-import { getApartments, getAllBookings, cancelBooking, createManualBooking, getBlocks, blockDay, unblockDay, getAllReviews, setReviewHidden, setReviewReply, saveApartment, deleteApartment, requestUploadUrl, addPhoto, getPhotos, deletePhoto } from "./db";
+import { getApartments, getAllBookings, cancelBooking, createManualBooking, getBlocks, blockDay, unblockDay, getAllReviews, setReviewHidden, setReviewReply, saveApartment, deleteApartment, requestUploadUrl, addPhoto, getPhotos, deletePhoto, setPhotoOrder } from "./db";
 import { MapPicker } from "./maps";
 
 const SRC = {
@@ -207,6 +207,15 @@ function EditApt({ lang, STR, id, onBack, apartments, onSaved }) {
   const tone = apt ? apt.tone : "sage";
   const count = apt ? apt.photos : 6;
   const [cover, setCover] = useState(0);
+  const [dragIdx, setDragIdx] = useState(null);
+  function reorderPhotos(from, to) {
+    if (from == null || to == null || from === to) return;
+    const next = photos.slice();
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
+    setPhotos(next);
+    setPhotoOrder(next.map((p, i) => ({ id: p.id, sort: i, is_cover: i === 0 }))).catch((e) => console.error("reorder failed:", e));
+  }
   const [titleI18n, setTitleI18n] = useState(apt ? { uz: apt.title?.uz || "", ru: apt.title?.ru || "", en: apt.title?.en || "" } : { uz: "", ru: "", en: "" });
   const [blurbI18n, setBlurbI18n] = useState(apt ? { uz: apt.blurb?.uz || "", ru: apt.blurb?.ru || "", en: apt.blurb?.en || "" } : { uz: "", ru: "", en: "" });
   const [editLang, setEditLang] = useState(lang);
@@ -289,7 +298,13 @@ function EditApt({ lang, STR, id, onBack, apartments, onSaved }) {
         <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={onFiles} />
         <div className="grid grid-cols-3 sm:grid-cols-4 gap-2.5">
           {photos.map((p, k) => (
-            <div key={p.id} className="relative aspect-square rounded-xl overflow-hidden group border border-line">
+            <div key={p.id}
+              draggable
+              onDragStart={() => setDragIdx(k)}
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={(e) => { e.preventDefault(); reorderPhotos(dragIdx, k); setDragIdx(null); }}
+              onDragEnd={() => setDragIdx(null)}
+              className={`relative aspect-square rounded-xl overflow-hidden group border cursor-move transition [&_img]:pointer-events-none ${dragIdx === k ? "opacity-40 ring-2 ring-green-600 border-green-600" : "border-line"}`}>
               <Photo tone={tone} idx={k} src={p.url} eager showLabel={false} className="w-full h-full" />
               {k === 0 && <div className="absolute top-1.5 left-1.5"><Badge tone="green">{STR[lang].a_cover}</Badge></div>}
               <button onClick={() => removePhoto(p)} className="absolute top-1.5 right-1.5 w-7 h-7 rounded-md bg-white/90 grid place-items-center text-[#9a4a3c] opacity-0 group-hover:opacity-100"><Icon name="trash" size={14} /></button>
@@ -299,7 +314,7 @@ function EditApt({ lang, STR, id, onBack, apartments, onSaved }) {
             <div className="text-center px-2"><Icon name={saving ? "refresh" : "plus"} size={22} className={`mx-auto ${saving ? "animate-spin" : ""}`} /><div className="text-[10.5px] font-semibold mt-1 leading-tight">{saving ? "…" : STR[lang].a_drop}</div></div>
           </button>
         </div>
-        <p className="text-[12px] text-inksoft mt-2">{lang === "ru" ? "Фото авто-сжимаются (WebP) и грузятся в R2." : lang === "uz" ? "Rasm avtomatik kichrayadi (WebP) va R2'ga yuklanadi." : "Photos are auto-compressed (WebP) and uploaded to R2."}</p>
+        <p className="text-[12px] text-inksoft mt-2">{lang === "ru" ? "Перетащите фото мышкой, чтобы изменить порядок. Первое фото — обложка. Авто-сжатие (WebP) → R2." : lang === "uz" ? "Tartibni o'zgartirish uchun rasmni sichqoncha bilan suring. Birinchi rasm — muqova. Avto-siqish (WebP) → R2." : "Drag photos to reorder. The first photo is the cover. Auto-compressed (WebP) → R2."}</p>
       </div>
       {/* title (3 languages) */}
       <label className="block mb-5">
@@ -661,7 +676,10 @@ function AdminGate({ lang, STR, onLogin, onExit }) {
 }
 
 export function Admin({ lang, STR, device, onExit, openLang, role, auth, onLogin }) {
-  const [tab, setTab] = useState("dash");
+  const [tab, setTab] = useState(() => {
+    const parts = (typeof window !== "undefined" ? (window.location.hash || "") : "").replace(/^#/, "").split("/");
+    return parts[0] === "admin" && ["dash", "list", "cal", "book", "reviews"].includes(parts[1]) ? parts[1] : "dash";
+  });
   const [editId, setEditId] = useState(null);
   const [apts, setApts] = useState([]);
   const [bookings, setBookings] = useState([]);
@@ -670,6 +688,11 @@ export function Admin({ lang, STR, device, onExit, openLang, role, auth, onLogin
     getApartments().then(setApts);
     getAllBookings().then(setBookings);
   }, [role]);
+  // reflect the open tab in the URL (#admin/list…) so a refresh returns here, not the dashboard
+  useEffect(() => {
+    const sub = tab === "dash" ? "#admin" : "#admin/" + tab;
+    if (window.location.hash !== sub) window.history.replaceState(null, "", sub);
+  }, [tab]);
 
   if (!auth) return <AdminGate lang={lang} STR={STR} onLogin={onLogin} onExit={onExit} />;
   if (role == null) return <div className="min-h-screen bg-canvas grid place-items-center"><div className="w-10 h-10 rounded-full border-[3px] border-green-600/25 border-t-green-700 animate-spin" /></div>;
