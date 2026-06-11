@@ -74,6 +74,21 @@ export default function App() {
   }, []);
   useEffect(() => { window.scrollTo(0, 0); }, [route.screen, route.apt]);
 
+  // restore a top-level screen from the URL hash, so a refresh keeps you put (e.g. admin)
+  useEffect(() => {
+    const h = (window.location.hash || "").replace(/^#/, "");
+    if (["saved", "bookings", "account", "admin"].includes(h)) setRoute({ screen: h });
+  }, []);
+  // keep the hash in sync with the current top-level screen (detail/booking carry an object → not hashable)
+  useEffect(() => {
+    const s = route.screen;
+    if (!["catalog", "saved", "bookings", "account", "admin"].includes(s)) return;
+    const want = s === "catalog" ? "" : "#" + s;
+    if (window.location.hash !== want) {
+      window.history.replaceState(null, "", want || window.location.pathname + window.location.search);
+    }
+  }, [route.screen]);
+
   const openLang = () => setLangOpen(true);
   const goCatalog = () => setRoute({ screen: "catalog" });
   const goAdmin = () => setRoute({ screen: "admin" });

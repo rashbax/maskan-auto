@@ -187,7 +187,7 @@ function Listings({ lang, STR, onEdit, apartments }) {
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {apts.map((a) => (
           <button key={a.id} onClick={() => onEdit(a.id)} className="text-left rounded-2xl border border-line bg-white overflow-hidden hover:shadow-card transition group">
-            <div className="aspect-[16/10] relative"><Photo tone={a.tone} idx={0} eager showLabel={false} className="w-full h-full group-hover:scale-105 transition-transform duration-500" />
+            <div className="aspect-[16/10] relative"><Photo tone={a.tone} idx={0} eager showLabel={false} src={a.photoUrls?.[0]} className="w-full h-full group-hover:scale-105 transition-transform duration-500" />
               <div className="absolute top-2.5 right-2.5"><Badge tone="cream">${a.price}</Badge></div></div>
             <div className="p-3.5">
               <div className="font-serif text-[15px] leading-snug truncate">{a.title[lang]}</div>
