@@ -352,8 +352,9 @@ function EditApt({ lang, STR, id, onBack, apartments, onSaved }) {
           <span className="text-[13px] font-bold">{STR[lang].a_desc}</span>
           {langTabs}
         </div>
-        <textarea rows={4} value={blurbI18n[editLang]} onChange={(e) => setBlurbI18n({ ...blurbI18n, [editLang]: e.target.value })} placeholder={STR[lang].a_desc_ph}
-          className="mt-1.5 w-full px-4 py-3 rounded-xl bg-white border border-line outline-none focus:border-green-600 focus:ring-2 focus:ring-green-600/15 transition text-[15px] resize-none leading-relaxed" />
+        <textarea rows={10} value={blurbI18n[editLang]} onChange={(e) => setBlurbI18n({ ...blurbI18n, [editLang]: e.target.value })} placeholder={STR[lang].a_desc_ph}
+          className="mt-1.5 w-full px-4 py-3 rounded-xl bg-white border border-line outline-none focus:border-green-600 focus:ring-2 focus:ring-green-600/15 transition text-[15px] resize-y min-h-[140px] leading-relaxed" />
+        <div className="text-[11.5px] text-inksoft mt-1 text-right tnum">{(blurbI18n[editLang] || "").length} {lang === "ru" ? "символов" : lang === "uz" ? "belgi" : "chars"}</div>
       </label>
 
       {/* location pick + exact address */}
