@@ -236,7 +236,7 @@ function EditApt({ lang, STR, id, onBack, apartments, onSaved }) {
   );
   function buildRow() {
     const nearI18n = apt?.near || { uz: "", ru: "", en: "" };
-    return { id: aptId, tone, price_usd: price, district, sleeps: guests, beds, baths, size_m2: size, lat, lng, title: titleI18n, blurb: blurbI18n, near: nearI18n, amenities: amen, photos_count: photos.length || count, status: "active" };
+    return { id: aptId, tone, price_usd: price, district, sleeps: guests, beds, baths, size_m2: size, lat, lng, host: apt?.host || "Maskan", title: titleI18n, blurb: blurbI18n, near: nearI18n, amenities: amen, photos_count: photos.length || count, status: "active" };
   }
   async function persistApartment() { await saveApartment(buildRow(), address); }
   async function save() {

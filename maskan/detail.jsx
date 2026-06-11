@@ -201,9 +201,9 @@ export function Detail({ apt, lang, STR, device, range, setRange, onBack, onBook
           {/* host */}
           <Section title={null} className="flex items-center justify-between !pt-6">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-full bg-green-700 text-cream grid place-items-center font-serif text-[18px]">{apt.host[0]}</div>
+              <div className="w-12 h-12 rounded-full bg-green-700 text-cream grid place-items-center font-serif text-[18px]">{(apt.host || "Maskan")[0]}</div>
               <div>
-                <div className="text-[15px] font-bold">{apt.host}</div>
+                <div className="text-[15px] font-bold">{apt.host || "Maskan"}</div>
                 <div className="text-[12.5px] text-inksoft">{STR[lang].response}</div>
               </div>
             </div>
