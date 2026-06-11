@@ -69,7 +69,7 @@ function PageShell({ lang, STR, device, tab, setTab, openLang, title, children }
 export function LoginButtons({ lang, STR, onLogin, full = true }) {
   return (
     <div className="space-y-2.5">
-      <TelegramLoginButton />
+      <TelegramLoginButton lang={lang} />
       <button onClick={() => onLogin("google")} className={`inline-flex items-center justify-center gap-2.5 ${full ? "w-full" : "px-5"} rounded-full bg-white border border-line text-ink font-semibold text-[15px] hover:border-ink/30 transition active:scale-[.985]`} style={{ height: 52 }}>
         <GoogleG size={19} />{STR[lang].login_google}</button>
     </div>

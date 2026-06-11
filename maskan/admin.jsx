@@ -676,7 +676,7 @@ function AdminGate({ lang, STR, onLogin, onExit }) {
           <div className="space-y-2.5">
             <button onClick={() => onLogin("google")} className="inline-flex items-center justify-center gap-2.5 w-full rounded-full bg-white border border-line text-ink font-semibold text-[15px] hover:border-ink/30 transition" style={{ height: 52 }}>
               <GoogleG size={19} />{STR[lang].login_google}</button>
-            <TelegramLoginButton />
+            <TelegramLoginButton lang={lang} />
           </div>
           <p className="text-[12px] text-inksoft text-center mt-4">{lang === "ru" ? "Войдите аккаунтом администратора." : lang === "uz" ? "Administrator akkaunti bilan kiring." : "Sign in with an admin account."}</p>
         </div>

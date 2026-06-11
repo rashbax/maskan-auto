@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 
@@ -22,7 +23,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
 
-  let update: { message?: { chat?: { id?: number }; text?: string; from?: { first_name?: string; username?: string } } };
+  let update: { message?: { chat?: { id?: number }; text?: string; from?: { id?: number; first_name?: string; last_name?: string; username?: string } } };
   try {
     update = await req.json();
   } catch {
@@ -35,7 +36,25 @@ export async function POST(req: Request) {
   if (!chatId) return NextResponse.json({ ok: true });
 
   if (text.startsWith("/start")) {
-    // The bot does NOT reveal booking details to anyone. Just a welcome.
+    // /start <nonce> = a website login request. Confirm the nonce with this verified user.
+    const nonce = text.split(/\s+/)[1];
+    const from = msg?.from;
+    if (nonce && from?.id) {
+      const sb = createAdminClient();
+      const { data: row } = await sb.from("telegram_login").select("status").eq("nonce", nonce).single();
+      if (row && row.status === "pending") {
+        await sb.from("telegram_login").update({
+          status: "confirmed",
+          telegram_id: String(from.id),
+          first_name: from.first_name || null,
+          last_name: from.last_name || null,
+          username: from.username || null,
+        }).eq("nonce", nonce);
+        await send(chatId, "✅ Maskan'ga kirdingiz! Brauzerga qaytishingiz mumkin.");
+        return NextResponse.json({ ok: true });
+      }
+    }
+    // plain /start (or unknown/expired nonce): just a welcome. No booking details revealed.
     await send(chatId, "Salom! Maskan botiga xush kelibsiz. Savolingiz boʻlsa shu yerga yozing — javob beramiz.");
     return NextResponse.json({ ok: true });
   }

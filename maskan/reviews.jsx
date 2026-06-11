@@ -97,7 +97,7 @@ function ReviewForm({ lang, STR, onSubmit, auth, onLogin, apartmentId }) {
       <div className="w-14 h-14 rounded-2xl bg-green-50 grid place-items-center text-green-700 mx-auto mb-3"><Icon name="lock" size={26} /></div>
       <p className="text-[14px] text-inksoft mb-5 max-w-xs mx-auto">{lang === "ru" ? "Войдите, чтобы оставить отзыв." : lang === "uz" ? "Sharh qoldirish uchun tizimga kiring." : "Sign in to leave a review."}</p>
       <div className="space-y-2.5 max-w-xs mx-auto">
-        <TelegramLoginButton />
+        <TelegramLoginButton lang={lang} height={48} />
         <button onClick={() => onLogin("google")} className="inline-flex items-center justify-center gap-2.5 w-full rounded-full bg-white border border-line text-ink font-semibold text-[14.5px] hover:border-ink/30 transition" style={{ height: 48 }}><GoogleG size={18} />{STR[lang].login_google}</button>
       </div>
     </div>
