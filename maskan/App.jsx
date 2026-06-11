@@ -51,6 +51,19 @@ export default function App() {
     return () => { alive = false; };
   }, []);
 
+  // Complete the Telegram bot-nonce login: the magic link redirects back with the session
+  // tokens in the URL fragment (#access_token=…). The PKCE browser client ignores that, so
+  // pick them up explicitly, set the session, and clean the URL.
+  useEffect(() => {
+    const h = window.location.hash || "";
+    if (!h.includes("access_token=")) return;
+    const params = new URLSearchParams(h.replace(/^#/, ""));
+    const access_token = params.get("access_token");
+    const refresh_token = params.get("refresh_token");
+    window.history.replaceState(null, "", window.location.pathname + window.location.search);
+    if (access_token && refresh_token) sb().auth.setSession({ access_token, refresh_token }).catch(() => {});
+  }, []);
+
   // real Supabase session
   useEffect(() => {
     const client = sb();
