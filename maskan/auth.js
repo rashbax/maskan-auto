@@ -12,13 +12,17 @@ export function sb() {
 export function mapUser(u) {
   if (!u) return null;
   const m = u.user_metadata || {};
-  const provider = u.app_metadata?.provider || "email";
+  // magic-link sign-in reports provider "email"; detect Telegram by the id we stored instead
+  const isTelegram = !!m.telegram_id;
+  const provider = isTelegram ? "telegram" : (u.app_metadata?.provider || "email");
   const name = m.full_name || m.name || (u.email ? u.email.split("@")[0] : "Mehmon");
+  // show @username for Telegram (the synthetic tg…@telegram.maskan email is internal only)
+  const handle = isTelegram ? (m.user_name ? "@" + m.user_name : name) : (u.email || "");
   return {
     id: u.id,
     provider,
     name,
-    handle: u.email || m.user_name || "",
+    handle,
     avatar: m.avatar_url || null,
   };
 }
