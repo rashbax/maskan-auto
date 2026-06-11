@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { Icon, Logo, Button, Photo, GoogleG, uzs, tgHref } from "./ui";
+import { TelegramLoginButton } from "./telegram-button";
 import { AptCard, StateBlock, fmtRange } from "./catalog";
 
 export const NAV = [
@@ -68,8 +69,7 @@ function PageShell({ lang, STR, device, tab, setTab, openLang, title, children }
 export function LoginButtons({ lang, STR, onLogin, full = true }) {
   return (
     <div className="space-y-2.5">
-      <button onClick={() => onLogin("telegram")} className={`inline-flex items-center justify-center gap-2.5 ${full ? "w-full" : "px-5"} rounded-full bg-green-700 text-cream font-semibold text-[15px] hover:bg-green-900 transition active:scale-[.985] shadow-[0_6px_16px_rgba(20,64,47,.22)]`} style={{ height: 52 }}>
-        <Icon name="tg" size={20} />{STR[lang].login_telegram}</button>
+      <TelegramLoginButton />
       <button onClick={() => onLogin("google")} className={`inline-flex items-center justify-center gap-2.5 ${full ? "w-full" : "px-5"} rounded-full bg-white border border-line text-ink font-semibold text-[15px] hover:border-ink/30 transition active:scale-[.985]`} style={{ height: 52 }}>
         <GoogleG size={19} />{STR[lang].login_google}</button>
     </div>
