@@ -20,14 +20,16 @@ export function TelegramLoginButton({ lang = "uz", height = 52 }) {
   const startedRef = useRef(0);
   const pollRef = useRef(null);
   const winRef = useRef(null); // the tab we opened to launch Telegram (closed on success)
+  const busyRef = useRef(false); // guard so the interval + visibility ticks never overlap
 
   const stop = () => { if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; } };
 
   const check = useCallback(async () => {
     const nonce = nonceRef.current;
-    if (!nonce) return;
-    if (Date.now() - startedRef.current > 5 * 60 * 1000) { stop(); setState("error"); return; }
+    if (!nonce || busyRef.current) return;
+    busyRef.current = true;
     try {
+      if (Date.now() - startedRef.current > 5 * 60 * 1000) { stop(); setState("error"); return; }
       const j = await (await fetch(`/api/auth/telegram/poll?nonce=${nonce}`)).json();
       if (j.status === "confirmed" && j.url) {
         stop();
@@ -37,6 +39,7 @@ export function TelegramLoginButton({ lang = "uz", height = 52 }) {
         window.location.href = j.url;
       } else if (j.status === "expired" || j.status === "error") { stop(); setState("error"); }
     } catch { /* transient — keep polling */ }
+    finally { busyRef.current = false; }
   }, []);
 
   // poll immediately whenever the tab regains focus (returning from Telegram)

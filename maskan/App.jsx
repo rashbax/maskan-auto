@@ -8,7 +8,7 @@ import { Booking } from "./booking";
 import { SavedPage, BookingsPage, AccountPage, BottomNav } from "./account";
 import { Admin } from "./admin";
 import { getApartments, getFavorites, getMyBookings, addFavorite, removeFavorite, getMyRole } from "./db";
-import { sb, mapUser, signInWithGoogle, signInWithTelegram, signOut } from "./auth";
+import { sb, mapUser, signInWithGoogle, signOut } from "./auth";
 
 const LANGS = ["uz", "ru", "en"];
 
@@ -117,10 +117,7 @@ export default function App() {
     else { n.add(id); if (auth) addFavorite(id); }
     return n;
   });
-  const login = (provider) => {
-    if (provider === "telegram") { signInWithTelegram(); return; }
-    signInWithGoogle();
-  };
+  const login = () => signInWithGoogle(); // Telegram has its own button (bot-nonce flow)
   const logout = () => signOut();
   const refreshApartments = () => getApartments().then(setApartments).catch(() => {});
   const refreshMyBookings = () => getMyBookings().then(setMyBookings).catch(() => {});

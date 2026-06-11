@@ -26,5 +26,7 @@ export async function mintTelegramSession(tg: TgUser, redirectTo?: string): Prom
 
   const { data: link, error } = await sb.auth.admin.generateLink({ type: "magiclink", email, options: { redirectTo } });
   if (error || !link?.properties?.action_link) return null;
+  // refuse if the account at this synthetic email wasn't created by the Telegram flow (email squatting)
+  if (String((link.user?.user_metadata as { telegram_id?: string } | undefined)?.telegram_id ?? "") !== String(tg.id)) return null;
   return link.properties.action_link;
 }

@@ -1,42 +1,51 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { createHash } from "crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { mintTelegramSession } from "@/lib/telegram-session";
 
 export const runtime = "nodejs";
 
 const TTL_MS = 5 * 60 * 1000; // a nonce is valid for 5 minutes
+const NO_STORE = { "Cache-Control": "no-store" } as const;
 
-// The login page polls this until the bot webhook confirms the nonce, then we mint a
-// one-time Supabase magic link and hand it back for the browser to redirect to.
-export async function GET(req: Request) {
-  const url = new URL(req.url);
-  const nonce = url.searchParams.get("nonce");
-  if (!nonce) return NextResponse.json({ status: "error" }, { status: 400 });
+// The login page polls this until the bot webhook confirms the nonce, then we mint a one-time
+// Supabase magic link. The poller must be the same browser that started the flow (verifier cookie).
+export async function GET(req: NextRequest) {
+  const nonce = req.nextUrl.searchParams.get("nonce");
+  if (!nonce) return NextResponse.json({ status: "error" }, { status: 400, headers: NO_STORE });
 
   const sb = createAdminClient();
   const { data } = await sb.from("telegram_login").select("*").eq("nonce", nonce).single();
-  if (!data) return NextResponse.json({ status: "expired" });
+  if (!data) return NextResponse.json({ status: "expired" }, { headers: NO_STORE });
+
+  // bind to the initiating browser
+  const v = req.cookies.get("tg_login")?.value;
+  const vh = v ? createHash("sha256").update(v).digest("hex") : "";
+  if (!data.verifier_hash || vh !== data.verifier_hash) {
+    return NextResponse.json({ status: "error" }, { status: 403, headers: NO_STORE });
+  }
 
   if (Date.now() - new Date(data.created_at).getTime() > TTL_MS) {
     await sb.from("telegram_login").delete().eq("nonce", nonce);
-    return NextResponse.json({ status: "expired" });
+    return NextResponse.json({ status: "expired" }, { headers: NO_STORE });
   }
   if (data.status !== "confirmed" || !data.telegram_id) {
-    return NextResponse.json({ status: "pending" });
+    return NextResponse.json({ status: "pending" }, { headers: NO_STORE });
   }
 
-  // Derive the PUBLIC origin from proxy headers — on Vercel `req.url` is the internal
-  // host (often localhost), which would send the magic-link redirect to the wrong place.
-  const host = req.headers.get("x-forwarded-host") || req.headers.get("host") || url.host;
+  // atomic claim — only the caller that actually deletes the row gets to mint (no double-redeem)
+  const { data: claimed } = await sb.from("telegram_login").delete().eq("nonce", nonce).eq("status", "confirmed").select().maybeSingle();
+  if (!claimed) return NextResponse.json({ status: "pending" }, { headers: NO_STORE });
+
+  // public origin from proxy headers (Vercel req.url host is the internal host)
+  const host = req.headers.get("x-forwarded-host") || req.headers.get("host") || req.nextUrl.host;
   const proto = req.headers.get("x-forwarded-proto") || (host.includes("localhost") ? "http" : "https");
   const origin = `${proto}://${host}`;
 
-  // confirmed → mint the session and burn the nonce (single use)
   const link = await mintTelegramSession(
-    { id: data.telegram_id, first_name: data.first_name, last_name: data.last_name, username: data.username, photo_url: data.photo_url },
+    { id: claimed.telegram_id, first_name: claimed.first_name, last_name: claimed.last_name, username: claimed.username, photo_url: claimed.photo_url },
     origin,
   );
-  await sb.from("telegram_login").delete().eq("nonce", nonce);
-  if (!link) return NextResponse.json({ status: "error" });
-  return NextResponse.json({ status: "confirmed", url: link });
+  if (!link) return NextResponse.json({ status: "error" }, { headers: NO_STORE });
+  return NextResponse.json({ status: "confirmed", url: link }, { headers: NO_STORE });
 }
