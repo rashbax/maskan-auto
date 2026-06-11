@@ -19,6 +19,7 @@ export function TelegramLoginButton({ lang = "uz", height = 52 }) {
   const nonceRef = useRef(null);
   const startedRef = useRef(0);
   const pollRef = useRef(null);
+  const winRef = useRef(null); // the tab we opened to launch Telegram (closed on success)
 
   const stop = () => { if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; } };
 
@@ -28,8 +29,13 @@ export function TelegramLoginButton({ lang = "uz", height = 52 }) {
     if (Date.now() - startedRef.current > 5 * 60 * 1000) { stop(); setState("error"); return; }
     try {
       const j = await (await fetch(`/api/auth/telegram/poll?nonce=${nonce}`)).json();
-      if (j.status === "confirmed" && j.url) { stop(); window.location.href = j.url; }
-      else if (j.status === "expired" || j.status === "error") { stop(); setState("error"); }
+      if (j.status === "confirmed" && j.url) {
+        stop();
+        // close the tab we opened for Telegram so focus returns to THIS (now signing-in) tab
+        const w = winRef.current;
+        if (w && !w.closed) { try { w.close(); } catch { /* cross-origin close is fine */ } }
+        window.location.href = j.url;
+      } else if (j.status === "expired" || j.status === "error") { stop(); setState("error"); }
     } catch { /* transient — keep polling */ }
   }, []);
 
@@ -44,6 +50,7 @@ export function TelegramLoginButton({ lang = "uz", height = 52 }) {
     setState("waiting");
     setLink(null);
     const win = window.open("", "_blank"); // best-effort open within the click gesture
+    winRef.current = win;
     try {
       const { nonce, url } = await (await fetch("/api/auth/telegram/start", { method: "POST" })).json();
       if (!url) throw new Error("no_url");
