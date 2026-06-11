@@ -25,10 +25,16 @@ export async function GET(req: Request) {
     return NextResponse.json({ status: "pending" });
   }
 
+  // Derive the PUBLIC origin from proxy headers — on Vercel `req.url` is the internal
+  // host (often localhost), which would send the magic-link redirect to the wrong place.
+  const host = req.headers.get("x-forwarded-host") || req.headers.get("host") || url.host;
+  const proto = req.headers.get("x-forwarded-proto") || url.protocol.replace(":", "");
+  const origin = `${proto}://${host}`;
+
   // confirmed → mint the session and burn the nonce (single use)
   const link = await mintTelegramSession(
     { id: data.telegram_id, first_name: data.first_name, last_name: data.last_name, username: data.username, photo_url: data.photo_url },
-    url.origin,
+    origin,
   );
   await sb.from("telegram_login").delete().eq("nonce", nonce);
   if (!link) return NextResponse.json({ status: "error" });
