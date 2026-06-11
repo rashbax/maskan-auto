@@ -31,7 +31,11 @@ export async function POST(req: Request) {
   const checkString = Object.keys(data).sort().map((k) => `${k}=${data[k]}`).join("\n");
   const secretKey = crypto.createHash("sha256").update(TOKEN).digest();
   const hmac = crypto.createHmac("sha256", secretKey).update(checkString).digest("hex");
-  if (hmac !== hash) return NextResponse.json({ error: "bad_hash" }, { status: 401 });
+  const a = Buffer.from(hmac);
+  const b = Buffer.from(hash);
+  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+    return NextResponse.json({ error: "bad_hash" }, { status: 401 });
+  }
   if (data.auth_date && Date.now() / 1000 - Number(data.auth_date) > 86400) {
     return NextResponse.json({ error: "expired" }, { status: 401 });
   }
@@ -56,10 +60,17 @@ export async function POST(req: Request) {
     })
     .catch(() => {});
 
+  // only honor a same-origin redirect (prevents open-redirect / session leak to other sites)
+  const reqOrigin = req.headers.get("origin");
+  let safeRedirect: string | undefined;
+  if (redirectTo && reqOrigin) {
+    try { if (new URL(redirectTo).origin === reqOrigin) safeRedirect = redirectTo; } catch { /* ignore bad url */ }
+  }
+
   const { data: link, error } = await sb.auth.admin.generateLink({
     type: "magiclink",
     email,
-    options: { redirectTo: redirectTo || undefined },
+    options: { redirectTo: safeRedirect },
   });
   if (error || !link?.properties?.action_link) {
     return NextResponse.json({ error: error?.message || "link_failed" }, { status: 500 });

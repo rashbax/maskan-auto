@@ -39,14 +39,18 @@ const TG_BOT_ID = "8834021236";
 
 function telegramAuth() {
   return new Promise((resolve) => {
-    const trigger = () =>
-      window.Telegram.Login.auth({ bot_id: TG_BOT_ID, request_access: "write" }, (data) => resolve(data || null));
+    let done = false;
+    const finish = (v) => { if (!done) { done = true; clearTimeout(timer); resolve(v); } };
+    // never leave the caller pending forever if Telegram never completes the popup
+    const timer = setTimeout(() => finish(null), 90000);
+    // no request_access: we only need to identify the user, not DM them from the bot
+    const trigger = () => window.Telegram.Login.auth({ bot_id: TG_BOT_ID }, (data) => finish(data || null));
     if (window.Telegram?.Login) return trigger();
     const s = document.createElement("script");
     s.src = "https://telegram.org/js/telegram-widget.js?22";
     s.async = true;
     s.onload = trigger;
-    s.onerror = () => resolve(null);
+    s.onerror = () => finish(null);
     document.body.appendChild(s);
   });
 }
