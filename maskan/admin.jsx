@@ -327,7 +327,8 @@ function EditApt({ lang, STR, id, onBack, apartments, onSaved }) {
           <span className="text-[13px] font-bold">{lang === "ru" ? "Название" : lang === "uz" ? "Nomi" : "Title"}</span>
           {langTabs}
         </div>
-        <input value={titleI18n[editLang]} onChange={(e) => setTitleI18n({ ...titleI18n, [editLang]: e.target.value })} placeholder={lang === "ru" ? "Напр. Светлая студия в центре" : lang === "uz" ? "Masalan, Markazdagi yorug studiya" : "e.g. Bright studio in the centre"} className={fld} />
+        <textarea rows={2} value={titleI18n[editLang]} onChange={(e) => setTitleI18n({ ...titleI18n, [editLang]: e.target.value })} placeholder={lang === "ru" ? "Напр. Светлая студия в центре" : lang === "uz" ? "Masalan, Markazdagi yorug studiya" : "e.g. Bright studio in the centre"}
+          className="mt-1.5 w-full px-4 py-3 rounded-xl bg-white border border-line outline-none focus:border-green-600 focus:ring-2 focus:ring-green-600/15 transition text-[15px] resize-y leading-snug" />
       </label>
       {/* basics */}
       <div className="grid sm:grid-cols-2 gap-4 mb-5">
