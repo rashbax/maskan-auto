@@ -49,9 +49,8 @@ export async function getApartments() {
     price: a.price_usd,
     district: a.district,
     sleeps: a.sleeps,
-    maxAdults: a.max_adults ?? a.sleeps ?? 2,
-    maxChildren: a.max_children ?? 0,
     beds: a.beds,
+    livingRooms: a.living_rooms ?? 0,
     baths: a.baths,
     size: a.size_m2,
     rating: Number(a.rating) || 0,
@@ -114,7 +113,7 @@ export async function setPhotoOrder(items) {
 
 // Create an instant booking. Access codes are NOT auto-sent — the host contacts
 // the guest (via the contact left here) to hand over keys at check-in.
-export async function createBooking({ apartmentId, guestName, phone, telegram, messenger, from, to, price }) {
+export async function createBooking({ apartmentId, guestName, phone, telegram, messenger, adults, children, from, to, price }) {
   const sb = createClient();
   const { data: { user } } = await sb.auth.getUser();
   const checkin = MASKAN.iso(from);
@@ -130,6 +129,8 @@ export async function createBooking({ apartmentId, guestName, phone, telegram, m
     phone: phone || null,
     telegram: telegram || null,
     messenger: messenger || "telegram",
+    adults: adults ?? null,
+    children: children ?? 0,
     checkin,
     checkout,
     nights,

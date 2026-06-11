@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
 import { MASKAN } from "./data";
-import { Icon, Logo, Button, Photo, ChannelBtn } from "./ui";
+import { Icon, Logo, Button, Photo, ChannelBtn, Stepper } from "./ui";
 import { nightsBetween } from "./calendar";
 import { fmtRange } from "./catalog";
 import { createBooking } from "./db";
@@ -108,7 +108,7 @@ function Confirmation({ apt, range, form, lang, STR, onHome, bookingId }) {
 export function Booking({ apt, range, lang, STR, device, onBack, onHome, onBooked }) {
   const desktop = device === "desktop";
   const [step, setStep] = useState("form"); // form | otp | confirming | done
-  const [form, setForm] = useState({ name: "", phone: "", tg: "", messenger: "telegram" });
+  const [form, setForm] = useState({ name: "", phone: "", tg: "", messenger: "telegram", adults: Math.min(2, apt.sleeps || 2), children: 0 });
   const [errs, setErrs] = useState({});
   const [bookingId, setBookingId] = useState("BK-" + (3120 + Math.floor(Math.random() * 80)));
 
@@ -133,6 +133,8 @@ export function Booking({ apt, range, lang, STR, device, onBack, onHome, onBooke
         phone: form.phone,
         telegram: form.tg,
         messenger: form.messenger,
+        adults: form.adults,
+        children: form.children,
         from: range.from,
         to: range.to,
         price: apt.price,
@@ -156,6 +158,17 @@ export function Booking({ apt, range, lang, STR, device, onBack, onHome, onBooke
           <h2 className="font-serif text-[22px] mt-6 mb-1">{STR[lang].reserve_title}</h2>
           <p className="text-[13.5px] text-inksoft mb-5">{lang === "ru" ? "Две детали — и квартира ваша." : lang === "uz" ? "Ikkita maʼlumot — va kvartira sizniki." : "Two details and the place is yours."}</p>
           <div className="space-y-4">
+            <div className="rounded-xl border border-line bg-white p-3.5">
+              <div className="flex items-center justify-between">
+                <div className="text-[13.5px] font-bold">{STR[lang].a_adults}</div>
+                <Stepper value={form.adults} min={1} max={Math.max(1, (apt.sleeps || 1) - form.children)} onChange={(v) => setForm({ ...form, adults: v })} />
+              </div>
+              <div className="flex items-center justify-between mt-3 pt-3 border-t border-line">
+                <div><div className="text-[13.5px] font-bold">{STR[lang].a_children}</div><div className="text-[12px] text-inksoft">{lang === "ru" ? "0–12 лет" : lang === "uz" ? "0–12 yosh" : "Ages 0–12"}</div></div>
+                <Stepper value={form.children} min={0} max={Math.max(0, (apt.sleeps || 1) - form.adults)} onChange={(v) => setForm({ ...form, children: v })} />
+              </div>
+              <div className="text-[12px] text-inksoft mt-2.5">{lang === "ru" ? `Максимум ${apt.sleeps} гостей` : lang === "uz" ? `Koʻpi bilan ${apt.sleeps} mehmon` : `Up to ${apt.sleeps} guests`}</div>
+            </div>
             <Field label={STR[lang].your_name} error={errs.name && "⚠"}>
               <input className={inputCls} placeholder={STR[lang].name_ph} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
             </Field>

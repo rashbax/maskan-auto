@@ -231,9 +231,9 @@ function EditApt({ lang, STR, id, onBack, apartments, onSaved }) {
   useEffect(() => { if (apt?.id) getPhotos(apt.id).then(setPhotos); }, []);
   const [price, setPrice] = useState(apt ? apt.price : 35);
   const [amen, setAmen] = useState(apt ? apt.amenities : ["wifi", "ac", "kitchen"]);
-  const [adults, setAdults] = useState(apt ? (apt.maxAdults ?? apt.sleeps ?? 2) : 2);
-  const [children, setChildren] = useState(apt ? (apt.maxChildren ?? 0) : 0);
+  const [guests, setGuests] = useState(apt ? (apt.sleeps ?? 2) : 2);
   const [beds, setBeds] = useState(apt ? apt.beds : 1);
+  const [livingRooms, setLivingRooms] = useState(apt ? (apt.livingRooms ?? 0) : 0);
   const [baths, setBaths] = useState(apt ? apt.baths : 1);
   const [size, setSize] = useState(apt ? apt.size : 40);
   const [district, setDistrict] = useState(apt ? apt.district : "mirobod");
@@ -251,7 +251,7 @@ function EditApt({ lang, STR, id, onBack, apartments, onSaved }) {
   );
   function buildRow() {
     const nearI18n = apt?.near || { uz: "", ru: "", en: "" };
-    return { id: aptId, tone, price_usd: Number(price) || 0, district, sleeps: Number(adults) + Number(children), max_adults: Number(adults) || 1, max_children: Number(children) || 0, beds: Number(beds) || 0, baths: Number(baths) || 1, size_m2: Number(size) || 0, lat, lng, host: apt?.host || "Maskan", title: titleI18n, blurb: blurbI18n, near: nearI18n, amenities: amen, photos_count: photos.length || count, status: "active" };
+    return { id: aptId, tone, price_usd: Number(price) || 0, district, sleeps: Number(guests) || 1, beds: Number(beds) || 0, living_rooms: Number(livingRooms) || 0, baths: Number(baths) || 1, size_m2: Number(size) || 0, lat, lng, host: apt?.host || "Maskan", title: titleI18n, blurb: blurbI18n, near: nearI18n, amenities: amen, photos_count: photos.length || count, status: "active" };
   }
   async function persistApartment() { await saveApartment(buildRow(), address); }
   async function save() {
@@ -343,15 +343,12 @@ function EditApt({ lang, STR, id, onBack, apartments, onSaved }) {
       {/* capacity */}
       <div className="rounded-2xl border border-line bg-white p-4 mb-5">
         <div className="flex items-center justify-between">
-          <div className="text-[14px] font-bold">{STR[lang].a_adults}</div>
-          <Stepper value={adults} min={1} max={16} onChange={setAdults} />
+          <div><div className="text-[14px] font-bold">{STR[lang].a_guests_field}</div><div className="text-[12px] text-inksoft">{lang === "ru" ? "Всего мест (взрослые + дети)" : lang === "uz" ? "Jami sigʻim (kattalar + bolalar)" : "Total capacity (adults + children)"}</div></div>
+          <Stepper value={guests} min={1} max={16} onChange={setGuests} />
         </div>
-        <div className="flex items-center justify-between mt-3">
-          <div><div className="text-[14px] font-bold">{STR[lang].a_children}</div><div className="text-[12px] text-inksoft">{lang === "ru" ? "0–12 лет" : lang === "uz" ? "0–12 yosh" : "Ages 0–12"}</div></div>
-          <Stepper value={children} min={0} max={10} onChange={setChildren} />
-        </div>
-        <div className="grid grid-cols-3 gap-3 mt-4 pt-4 border-t border-line">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4 pt-4 border-t border-line">
           <NumF label={STR[lang].a_beds} value={beds} set={setBeds} min={0} />
+          <NumF label={STR[lang].a_living} value={livingRooms} set={setLivingRooms} min={0} />
           <NumF label={STR[lang].a_baths} value={baths} set={setBaths} min={1} />
           <NumF label={STR[lang].a_size} value={size} set={setSize} min={10} max={500} />
         </div>

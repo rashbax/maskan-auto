@@ -27,18 +27,29 @@ export async function POST(req: Request) {
   const { data: apt } = await sb.from("apartments").select("title,district").eq("id", b.apartment_id).single();
 
   const title = apt?.title?.uz || apt?.title?.ru || apt?.title?.en || b.apartment_id;
+
+  // If the guest signed in with Telegram, we already have their @username — show it even
+  // when they didn't type one into the booking form.
+  let acctUser: string | undefined;
+  if (b.user_id) {
+    const { data: u } = await sb.auth.admin.getUserById(b.user_id);
+    acctUser = (u?.user?.user_metadata as { user_name?: string } | undefined)?.user_name;
+  }
+  const tgHandle = b.telegram || (acctUser ? "@" + acctUser : "");
+
   const text = [
     "🆕 Yangi bron!",
     `🏠 ${title}`,
     `📅 ${b.checkin} → ${b.checkout} (${b.nights} kecha)`,
     `👤 ${b.guest_name || "—"}`,
-    `📞 ${b.phone || "—"}${b.telegram ? " · " + b.telegram : ""}`,
+    b.adults != null ? `👥 ${b.adults} katta${b.children ? `, ${b.children} bola` : ""}` : null,
+    `📞 ${b.phone || "—"}${tgHandle ? " · " + tgHandle : ""}`,
     `💬 Afzal: ${b.messenger}`,
     `💵 $${b.total_usd ?? "—"}`,
     `🔖 ${b.id}`,
     "",
     "Mehmon bilan bogʻlanib, kelishda kalit va manzilni bering.",
-  ].join("\n");
+  ].filter(Boolean).join("\n");
 
   const res = await fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
     method: "POST",
