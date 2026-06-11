@@ -210,7 +210,7 @@ export function Detail({ apt, lang, STR, device, range, setRange, onBack, onBook
             <Button variant="outline" size="sm" icon="tg">Telegram</Button>
           </Section>
 
-          <Section title={null}><p className="text-[15px] leading-relaxed text-ink/85">{apt.blurb[lang]}</p></Section>
+          <Section title={null}><p className="text-[15px] leading-relaxed text-ink/85 whitespace-pre-line">{apt.blurb[lang]}</p></Section>
 
           <Section title={STR[lang].amenities}>
             <Amenities apt={apt} lang={lang} max={6} />
