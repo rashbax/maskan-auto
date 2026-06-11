@@ -28,7 +28,7 @@ export async function GET(req: Request) {
   // Derive the PUBLIC origin from proxy headers — on Vercel `req.url` is the internal
   // host (often localhost), which would send the magic-link redirect to the wrong place.
   const host = req.headers.get("x-forwarded-host") || req.headers.get("host") || url.host;
-  const proto = req.headers.get("x-forwarded-proto") || url.protocol.replace(":", "");
+  const proto = req.headers.get("x-forwarded-proto") || (host.includes("localhost") ? "http" : "https");
   const origin = `${proto}://${host}`;
 
   // confirmed → mint the session and burn the nonce (single use)
