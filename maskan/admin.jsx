@@ -25,13 +25,17 @@ function StatCard({ label, value, sub, accent }) {
 }
 
 function NumF({ label, value, set, min = 0, max = 999 }) {
+  const cur = Number(value) || min;
   return (
     <div>
       <div className="text-[12px] font-bold text-inksoft mb-1.5">{label}</div>
       <div className="flex items-center rounded-xl border border-line bg-white h-11 overflow-hidden">
-        <button onClick={() => set(Math.max(min, value - 1))} className="w-10 h-full grid place-items-center text-inksoft hover:bg-black/[.03]"><Icon name="minus" size={16} /></button>
-        <input value={value} onChange={(e) => set(Math.max(min, Math.min(max, +e.target.value || 0)))} className="flex-1 w-full text-center text-[15px] font-bold tnum outline-none bg-transparent" />
-        <button onClick={() => set(Math.min(max, value + 1))} className="w-10 h-full grid place-items-center text-inksoft hover:bg-black/[.03]"><Icon name="plus" size={16} /></button>
+        <button type="button" onClick={() => set(Math.max(min, cur - 1))} className="w-10 h-full grid place-items-center text-inksoft hover:bg-black/[.03]"><Icon name="minus" size={16} /></button>
+        <input value={value} inputMode="numeric"
+          onChange={(e) => set(e.target.value.replace(/[^\d]/g, ""))}
+          onBlur={(e) => set(Math.max(min, Math.min(max, parseInt(e.target.value, 10) || min)))}
+          className="flex-1 w-full text-center text-[15px] font-bold tnum outline-none bg-transparent" />
+        <button type="button" onClick={() => set(Math.min(max, cur + 1))} className="w-10 h-full grid place-items-center text-inksoft hover:bg-black/[.03]"><Icon name="plus" size={16} /></button>
       </div>
     </div>
   );
@@ -226,7 +230,8 @@ function EditApt({ lang, STR, id, onBack, apartments, onSaved }) {
   useEffect(() => { if (apt?.id) getPhotos(apt.id).then(setPhotos); }, []);
   const [price, setPrice] = useState(apt ? apt.price : 35);
   const [amen, setAmen] = useState(apt ? apt.amenities : ["wifi", "ac", "kitchen"]);
-  const [guests, setGuests] = useState(apt ? apt.sleeps : 2);
+  const [adults, setAdults] = useState(apt ? (apt.maxAdults ?? apt.sleeps ?? 2) : 2);
+  const [children, setChildren] = useState(apt ? (apt.maxChildren ?? 0) : 0);
   const [beds, setBeds] = useState(apt ? apt.beds : 1);
   const [baths, setBaths] = useState(apt ? apt.baths : 1);
   const [size, setSize] = useState(apt ? apt.size : 40);
@@ -245,7 +250,7 @@ function EditApt({ lang, STR, id, onBack, apartments, onSaved }) {
   );
   function buildRow() {
     const nearI18n = apt?.near || { uz: "", ru: "", en: "" };
-    return { id: aptId, tone, price_usd: price, district, sleeps: guests, beds, baths, size_m2: size, lat, lng, host: apt?.host || "Maskan", title: titleI18n, blurb: blurbI18n, near: nearI18n, amenities: amen, photos_count: photos.length || count, status: "active" };
+    return { id: aptId, tone, price_usd: Number(price) || 0, district, sleeps: Number(adults) + Number(children), max_adults: Number(adults) || 1, max_children: Number(children) || 0, beds: Number(beds) || 0, baths: Number(baths) || 1, size_m2: Number(size) || 0, lat, lng, host: apt?.host || "Maskan", title: titleI18n, blurb: blurbI18n, near: nearI18n, amenities: amen, photos_count: photos.length || count, status: "active" };
   }
   async function persistApartment() { await saveApartment(buildRow(), address); }
   async function save() {
@@ -327,7 +332,7 @@ function EditApt({ lang, STR, id, onBack, apartments, onSaved }) {
       {/* basics */}
       <div className="grid sm:grid-cols-2 gap-4 mb-5">
         <label className="block"><span className="text-[13px] font-bold">{STR[lang].a_price} ($)</span>
-          <input type="number" value={price} onChange={(e) => setPrice(+e.target.value)} className={fld + " tnum"} /></label>
+          <input type="number" inputMode="numeric" value={price} onChange={(e) => setPrice(e.target.value)} onBlur={(e) => setPrice(Math.max(0, Number(e.target.value) || 0))} className={fld + " tnum"} /></label>
         <label className="block"><span className="text-[13px] font-bold">{STR[lang].district}</span>
           <select value={district} onChange={(e) => setDistrict(e.target.value)} className={fld}>
             {Object.keys(M.DISTRICTS).map((k) => <option key={k} value={k}>{M.DISTRICTS[k][lang]}</option>)}</select></label>
@@ -336,8 +341,12 @@ function EditApt({ lang, STR, id, onBack, apartments, onSaved }) {
       {/* capacity */}
       <div className="rounded-2xl border border-line bg-white p-4 mb-5">
         <div className="flex items-center justify-between">
-          <div><div className="text-[14px] font-bold">{STR[lang].a_guests_field}</div><div className="text-[12px] text-inksoft">{STR[lang].guest_n(guests)}</div></div>
-          <Stepper value={guests} min={1} max={12} onChange={setGuests} />
+          <div className="text-[14px] font-bold">{STR[lang].a_adults}</div>
+          <Stepper value={adults} min={1} max={16} onChange={setAdults} />
+        </div>
+        <div className="flex items-center justify-between mt-3">
+          <div><div className="text-[14px] font-bold">{STR[lang].a_children}</div><div className="text-[12px] text-inksoft">{lang === "ru" ? "0–12 лет" : lang === "uz" ? "0–12 yosh" : "Ages 0–12"}</div></div>
+          <Stepper value={children} min={0} max={10} onChange={setChildren} />
         </div>
         <div className="grid grid-cols-3 gap-3 mt-4 pt-4 border-t border-line">
           <NumF label={STR[lang].a_beds} value={beds} set={setBeds} min={0} />

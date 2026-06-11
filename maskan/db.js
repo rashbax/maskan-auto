@@ -49,6 +49,8 @@ export async function getApartments() {
     price: a.price_usd,
     district: a.district,
     sleeps: a.sleeps,
+    maxAdults: a.max_adults ?? a.sleeps ?? 2,
+    maxChildren: a.max_children ?? 0,
     beds: a.beds,
     baths: a.baths,
     size: a.size_m2,
