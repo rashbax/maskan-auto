@@ -78,9 +78,14 @@ export function ApartmentView({ apt, locale }: { apt: any; locale: Locale }) {
     <div className="min-h-screen bg-canvas">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(ld) }} />
       <header className="sticky top-0 z-30 bg-canvas/90 backdrop-blur border-b border-line">
-        <div className="max-w-6xl mx-auto px-4 md:px-8 h-14 flex items-center justify-between">
-          <Link href={home} className="font-serif text-[18px] font-semibold">Maskan</Link>
-          <Link href={home} className="text-[13.5px] font-semibold text-inksoft hover:text-ink">← {T.catalog[locale]}</Link>
+        <div className="max-w-6xl mx-auto px-4 md:px-8 h-14 flex items-center gap-2.5">
+          <Link href={home} aria-label={T.catalog[locale]} className="inline-flex items-center gap-1.5 -ml-1 pr-2 h-9 rounded-full text-[14px] font-semibold hover:opacity-70">
+            <span className="w-9 h-9 grid place-items-center rounded-full hover:bg-black/5">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5M12 19l-7-7 7-7" /></svg>
+            </span>
+            {T.catalog[locale]}
+          </Link>
+          <span className="ml-auto font-serif text-[18px] font-semibold">Maskan</span>
         </div>
       </header>
 
