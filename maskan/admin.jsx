@@ -705,15 +705,31 @@ export function Admin({ lang, STR, device, onExit, openLang, role, auth, onLogin
     getApartments().then(setApts);
     getAllBookings().then(setBookings);
   }, [role]);
-  // reflect the open tab in the URL (#admin/list…) so a refresh returns here, not the dashboard
+  // Browser Back/Forward inside admin: restore the tab (from the hash) + editId (from state).
   useEffect(() => {
-    const sub = tab === "dash" ? "#admin" : "#admin/" + tab;
-    if (window.location.hash !== sub) window.history.replaceState({ screen: "admin", aptId: null }, "", sub);
-  }, [tab]);
+    const onPop = (e) => {
+      const parts = (window.location.hash || "").replace(/^#/, "").split("/");
+      if (parts[0] !== "admin") return; // leaving admin — the App-level handler switches screens
+      setTab(["dash", "list", "cal", "book", "reviews"].includes(parts[1]) ? parts[1] : "dash");
+      setEditId((e.state && e.state.editId) || null);
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
 
   if (!auth) return <AdminGate lang={lang} STR={STR} onLogin={onLogin} onExit={onExit} />;
   if (role == null) return <div className="min-h-screen bg-canvas grid place-items-center"><div className="w-10 h-10 rounded-full border-[3px] border-green-600/25 border-t-green-700 animate-spin" /></div>;
   if (role !== "admin") return <Admin404 lang={lang} STR={STR} onBack={onExit} />;
+
+  // navigate within admin via history so Back walks tabs/edit (not straight to the catalog)
+  const goTab = (k) => {
+    setTab(k); setEditId(null);
+    window.history.pushState({ screen: "admin", editId: null }, "", k === "dash" ? "#admin" : "#admin/" + k);
+  };
+  const goEdit = (id) => {
+    setEditId(id);
+    window.history.pushState({ screen: "admin", editId: id }, "", tab === "dash" ? "#admin/list" : "#admin/" + tab);
+  };
 
   const nav = [
     { k: "dash", label: STR[lang].a_dashboard, icon: "grid" },
@@ -731,7 +747,7 @@ export function Admin({ lang, STR, device, onExit, openLang, role, auth, onLogin
         <div className="px-2 mb-7"><Logo size={30} /></div>
         <nav className="space-y-1 flex-1">
           {nav.map((n) => (
-            <button key={n.k} onClick={() => { setTab(n.k); setEditId(null); }}
+            <button key={n.k} onClick={() => goTab(n.k)}
               className={`w-full flex items-center gap-3 h-11 px-3 rounded-xl text-[14px] font-semibold transition ${tab === n.k ? "bg-green-50 text-green-700" : "text-inksoft hover:bg-black/[.03]"}`}>
               <Icon name={n.icon} size={19} />{n.label}</button>
           ))}
@@ -747,13 +763,13 @@ export function Admin({ lang, STR, device, onExit, openLang, role, auth, onLogin
           </div>
           {/* mobile tabs */}
           <div className="md:hidden flex gap-2 overflow-x-auto no-scrollbar pb-2.5 -mt-1">
-            {nav.map((n) => <Chip key={n.k} active={tab === n.k} icon={n.icon} onClick={() => { setTab(n.k); setEditId(null); }}>{n.label}</Chip>)}
+            {nav.map((n) => <Chip key={n.k} active={tab === n.k} icon={n.icon} onClick={() => goTab(n.k)}>{n.label}</Chip>)}
           </div>
         </header>
         <main className="flex-1 px-5 md:px-8 py-6 overflow-y-auto no-scrollbar">
-          {editId ? <EditApt lang={lang} STR={STR} id={editId} onBack={() => setEditId(null)} apartments={apts} onSaved={() => getApartments().then(setApts)} />
+          {editId ? <EditApt lang={lang} STR={STR} id={editId} onBack={() => window.history.back()} apartments={apts} onSaved={() => getApartments().then(setApts)} />
             : tab === "dash" ? <Dashboard lang={lang} STR={STR} bookings={bookings} apartments={apts} />
-            : tab === "list" ? <Listings lang={lang} STR={STR} onEdit={setEditId} apartments={apts} />
+            : tab === "list" ? <Listings lang={lang} STR={STR} onEdit={goEdit} apartments={apts} />
             : tab === "cal" ? <CalManager lang={lang} STR={STR} apartments={apts} bookings={bookings} />
             : tab === "reviews" ? <ReviewsModeration lang={lang} STR={STR} apartments={apts} />
             : <BookingsList lang={lang} STR={STR} bookings={bookings} apartments={apts} onChanged={() => getAllBookings().then(setBookings)} />}
