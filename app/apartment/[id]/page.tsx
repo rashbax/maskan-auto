@@ -5,10 +5,19 @@ import { MASKAN } from "@/maskan/data";
 import { MapView } from "@/maskan/maps";
 import { AptReserve } from "@/maskan/apt-reserve";
 import { getApartmentForMeta, getApartmentFull } from "@/lib/apartments-server";
+import { publicDb } from "@/lib/supabase/public";
 
 type Params = { params: Promise<{ id: string }> };
 
 const pick = (o: Record<string, string> | undefined) => (o?.uz || o?.ru || o?.en || "").trim();
+
+export const revalidate = 3600; // ISR: serve cached HTML, refresh hourly
+export const dynamicParams = true; // apartments not prebuilt render on demand, then cache
+
+export async function generateStaticParams() {
+  const { data } = await publicDb().from("apartments").select("id").eq("status", "active");
+  return (data ?? []).map((a) => ({ id: a.id as string }));
+}
 
 // Per-apartment metadata → shareable links (rich preview) + search visibility.
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
@@ -20,7 +29,7 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const description =
     pick(apt.blurb).replace(/\s+/g, " ").slice(0, 160) ||
     `Toshkentda kunlik kvartira — $${apt.price}/kecha, ${apt.sleeps} kishigacha. Lahzada band qiling.`;
-  const images = apt.cover ? [{ url: apt.cover }] : undefined;
+  const images = apt.cover ? [{ url: apt.cover, alt: name }] : undefined;
   return {
     title,
     description,
@@ -41,8 +50,23 @@ export default async function ApartmentPage({ params }: Params) {
   const district = (M.DISTRICTS as Record<string, { uz: string }>)[apt.district]?.uz || apt.district;
   const photos: string[] = apt.photoUrls || [];
 
+  // structured data → rich snippets (stars, price) in Google/Yandex
+  const ld = {
+    "@context": "https://schema.org",
+    "@type": "Apartment",
+    name,
+    image: photos.slice(0, 5),
+    numberOfRooms: apt.beds,
+    occupancy: { "@type": "QuantitativeValue", maxValue: apt.sleeps },
+    address: { "@type": "PostalAddress", addressLocality: "Tashkent", addressRegion: district, addressCountry: "UZ" },
+    ...(apt.lat != null && apt.lng != null ? { geo: { "@type": "GeoCoordinates", latitude: apt.lat, longitude: apt.lng } } : {}),
+    ...(apt.reviews > 0 ? { aggregateRating: { "@type": "AggregateRating", ratingValue: apt.rating.toFixed(2), reviewCount: apt.reviews } } : {}),
+    offers: { "@type": "Offer", price: apt.price, priceCurrency: "USD", availability: "https://schema.org/InStock" },
+  };
+
   return (
     <div className="min-h-screen bg-canvas">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(ld) }} />
       <header className="sticky top-0 z-30 bg-canvas/90 backdrop-blur border-b border-line">
         <div className="max-w-6xl mx-auto px-4 md:px-8 h-14 flex items-center justify-between">
           <Link href="/" className="font-serif text-[18px] font-semibold">Maskan</Link>

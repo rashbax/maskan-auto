@@ -26,10 +26,18 @@ export function AptReserve({ apt }) {
 
   useEffect(() => {
     const sb = createClient();
-    sb.rpc("busy_dates").then(({ data }) => {
-      setBusy(new Set((data || []).filter((r) => r.apartment_id === apt.id).map((r) => r.d)));
+    sb.rpc("busy_dates_for", { p_apartment_id: apt.id }).then(({ data }) => {
+      setBusy(new Set((data || []).map((r) => r.d)));
     }).catch(() => {});
   }, [apt.id]);
+
+  // lock background scroll while the booking overlay is open
+  useEffect(() => {
+    if (!booking) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prev; };
+  }, [booking]);
 
   const nights = range.from && range.to ? nightsBetween(range.from, range.to) : 0;
 

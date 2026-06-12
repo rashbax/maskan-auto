@@ -1,8 +1,10 @@
-import { createClient } from "@/lib/supabase/server";
+import { cache } from "react";
+import { publicDb } from "@/lib/supabase/public";
 
 // Full apartment for the server-rendered detail page (content the crawlers must see).
-export async function getApartmentFull(id: string) {
-  const sb = await createClient();
+// cache() dedupes within a render; publicDb() (no cookies) keeps the route ISR-cacheable.
+export const getApartmentFull = cache(async (id: string) => {
+  const sb = publicDb();
   const { data: a } = await sb.from("apartments").select("*").eq("id", id).eq("status", "active").single();
   if (!a) return null;
 
@@ -43,11 +45,11 @@ export async function getApartmentFull(id: string) {
       date: (r.created_at || "").slice(0, 10), cons: r.cons || "", text: r.text || "", hostReply: r.host_reply || "",
     })),
   };
-}
+});
 
 // Server-side fetch of one apartment + its cover photo, for SEO metadata / Open Graph.
-export async function getApartmentForMeta(id: string) {
-  const sb = await createClient();
+export const getApartmentForMeta = cache(async (id: string) => {
+  const sb = publicDb();
   const { data: a } = await sb
     .from("apartments")
     .select("id,title,blurb,district,price_usd,sleeps")
@@ -74,4 +76,4 @@ export async function getApartmentForMeta(id: string) {
     sleeps: a.sleeps as number,
     cover: (photo?.url as string | undefined) || null,
   };
-}
+});

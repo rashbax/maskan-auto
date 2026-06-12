@@ -111,6 +111,7 @@ export function Booking({ apt, range, lang, STR, device, onBack, onHome, onBooke
   const [form, setForm] = useState({ name: "", phone: "", tg: "", messenger: "telegram", adults: Math.min(2, apt.sleeps || 2), children: 0 });
   const [errs, setErrs] = useState({});
   const [bookingId, setBookingId] = useState("BK-" + (3120 + Math.floor(Math.random() * 80)));
+  const submittingRef = useRef(false);
 
   function validate() {
     const e = {};
@@ -121,7 +122,8 @@ export function Booking({ apt, range, lang, STR, device, onBack, onHome, onBooke
     setErrs(e); return Object.keys(e).length === 0;
   }
   function submit() {
-    if (!validate()) return;
+    if (!validate() || submittingRef.current) return; // guard against double-tap
+    submittingRef.current = true;
     finishOtp(); // OTP step disabled for now (re-enable later if needed)
   }
   async function finishOtp() {
