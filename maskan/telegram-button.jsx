@@ -55,7 +55,9 @@ export function TelegramLoginButton({ lang = "uz", height = 52 }) {
     const win = window.open("", "_blank"); // best-effort open within the click gesture
     winRef.current = win;
     try {
-      const { nonce, url } = await (await fetch("/api/auth/telegram/start", { method: "POST" })).json();
+      const { nonce, url } = await (await fetch("/api/auth/telegram/start", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ lang }),
+      })).json();
       if (!url) throw new Error("no_url");
       nonceRef.current = nonce;
       startedRef.current = Date.now();

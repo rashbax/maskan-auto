@@ -8,7 +8,13 @@ const BOT = process.env.TELEGRAM_BOT_USERNAME || "maskan_tashkentbot";
 
 // Begin a bot-based login: create a pending nonce + a browser-bound verifier (kept in an
 // httpOnly cookie) and hand back the deep link to open (t.me/<bot>?start=<nonce>).
-export async function POST() {
+export async function POST(req: Request) {
+  let lang = "uz";
+  try {
+    const b = await req.json();
+    if (typeof b?.lang === "string" && ["uz", "ru", "en"].includes(b.lang)) lang = b.lang;
+  } catch { /* no body — default uz */ }
+
   const nonce = randomUUID().replace(/-/g, "");
   const verifier = randomUUID().replace(/-/g, "");
   const sb = createAdminClient();
@@ -19,6 +25,7 @@ export async function POST() {
   const { error } = await sb.from("telegram_login").insert({
     nonce,
     status: "pending",
+    lang,
     verifier_hash: createHash("sha256").update(verifier).digest("hex"),
   });
   if (error) return NextResponse.json({ error: "init_failed" }, { status: 500 });

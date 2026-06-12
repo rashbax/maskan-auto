@@ -17,6 +17,26 @@ async function send(chatId: number | string, text: string, extra: Record<string,
 
 type From = { id?: number; first_name?: string; last_name?: string; username?: string };
 
+const CONSENT = {
+  uz: {
+    text: "👋 Assalomu alaykum! Maskan'ga xush kelibsiz 🏡\n\nToshkent boʻylab eng qulay kunlik kvartiralar shu yerda. Hisobingizga kirsangiz — yoqqan kvartiralarni saqlash va bron qilish ancha oson boʻladi.\n\nProfilingizga kirish uchun pastdagi tugmani bosing 👇",
+    button: "✅ Ha, kirishni tasdiqlayman",
+    done: "🎉 Tayyor! Maskan'ga kirdingiz. Endi brauzerga qayting — sizni zoʻr kvartiralar kutyapti 🏡",
+  },
+  ru: {
+    text: "👋 Здравствуйте! Добро пожаловать в Maskan 🏡\n\nЛучшие посуточные квартиры Ташкента — здесь. Войдите в аккаунт, чтобы сохранять понравившиеся варианты и бронировать в пару кликов.\n\nЧтобы войти в профиль, нажмите кнопку ниже 👇",
+    button: "✅ Да, войти",
+    done: "🎉 Готово! Вы вошли в Maskan. Возвращайтесь в браузер — вас ждут отличные квартиры 🏡",
+  },
+  en: {
+    text: "👋 Hello! Welcome to Maskan 🏡\n\nTashkent's best daily apartments are right here. Sign in to save your favourites and book in just a couple of taps.\n\nTo sign in to your profile, tap the button below 👇",
+    button: "✅ Yes, sign in",
+    done: "🎉 Done! You're signed in to Maskan. Head back to your browser — great apartments await 🏡",
+  },
+} as const;
+
+const pick = (lang?: string) => CONSENT[(lang as keyof typeof CONSENT)] || CONSENT.uz;
+
 // Telegram bot webhook. Confirms a website login ONLY after the user taps an explicit consent
 // button (so an attacker can't have a victim's /start stamp a nonce the attacker initiated).
 export async function POST(req: Request) {
@@ -60,7 +80,7 @@ export async function POST(req: Request) {
       body: JSON.stringify({ callback_query_id: cb.id, text: upd ? "✅" : "Muddati oʻtgan" }),
     });
     const cbChat = cb.message?.chat?.id;
-    if (upd && cbChat) await send(cbChat, "🎉 Tayyor! Maskan'ga kirdingiz. Endi brauzerga qayting — sizni zoʻr kvartiralar kutyapti 🏡");
+    if (upd && cbChat) await send(cbChat, pick((upd as { lang?: string }).lang).done);
     return NextResponse.json({ ok: true });
   }
 
@@ -74,11 +94,10 @@ export async function POST(req: Request) {
     const nonce = text.split(/\s+/)[1];
     if (nonce && msg?.from?.id) {
       const sb = createAdminClient();
-      const { data: row } = await sb.from("telegram_login").select("status").eq("nonce", nonce).single();
+      const { data: row } = await sb.from("telegram_login").select("status, lang").eq("nonce", nonce).single();
       if (row?.status === "pending") {
-        await send(chatId, "👋 Assalomu alaykum! Maskan'ga xush kelibsiz 🏡\n\nToshkent boʻylab eng qulay kunlik kvartiralar shu yerda. Hisobingizga kirsangiz — yoqqan kvartiralarni saqlash va bron qilish ancha oson boʻladi.\n\nDavom etamizmi? Pastdagi tugmani bosing 👇\n\nℹ️ Agar bu soʻrovni siz boshlamagan boʻlsangiz, shunchaki eʼtibor bermang — hech narsa boʻlmaydi.", {
-          reply_markup: { inline_keyboard: [[{ text: "✅ Ha, kirishni tasdiqlayman", callback_data: `login:${nonce}` }]] },
-        });
+        const c = pick(row.lang);
+        await send(chatId, c.text, { reply_markup: { inline_keyboard: [[{ text: c.button, callback_data: `login:${nonce}` }]] } });
         return NextResponse.json({ ok: true });
       }
     }
