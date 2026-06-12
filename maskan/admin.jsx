@@ -223,6 +223,7 @@ function EditApt({ lang, STR, id, onBack, apartments, onSaved }) {
   }
   const [titleI18n, setTitleI18n] = useState(apt ? { uz: apt.title?.uz || "", ru: apt.title?.ru || "", en: apt.title?.en || "" } : { uz: "", ru: "", en: "" });
   const [blurbI18n, setBlurbI18n] = useState(apt ? { uz: apt.blurb?.uz || "", ru: apt.blurb?.ru || "", en: apt.blurb?.en || "" } : { uz: "", ru: "", en: "" });
+  const [nearI18n, setNearI18n] = useState(apt ? { uz: apt.near?.uz || "", ru: apt.near?.ru || "", en: apt.near?.en || "" } : { uz: "", ru: "", en: "" });
   const [editLang, setEditLang] = useState(lang);
   const [saving, setSaving] = useState(false);
   const [aptId] = useState(apt?.id || ("apt-" + Date.now().toString(36)));
@@ -250,7 +251,6 @@ function EditApt({ lang, STR, id, onBack, apartments, onSaved }) {
     </div>
   );
   function buildRow() {
-    const nearI18n = apt?.near || { uz: "", ru: "", en: "" };
     return { id: aptId, tone, price_usd: Number(price) || 0, district, sleeps: Number(guests) || 1, beds: Number(beds) || 0, living_rooms: Number(livingRooms) || 0, baths: Number(baths) || 1, size_m2: Number(size) || 0, lat, lng, host: apt?.host || "Maskan", title: titleI18n, blurb: blurbI18n, near: nearI18n, amenities: amen, photos_count: photos.length || count, status: "active" };
   }
   async function persistApartment() { await saveApartment(buildRow(), address); }
@@ -363,6 +363,15 @@ function EditApt({ lang, STR, id, onBack, apartments, onSaved }) {
         <textarea rows={10} value={blurbI18n[editLang]} onChange={(e) => setBlurbI18n({ ...blurbI18n, [editLang]: e.target.value })} placeholder={STR[lang].a_desc_ph}
           className="mt-1.5 w-full px-4 py-3 rounded-xl bg-white border border-line outline-none focus:border-green-600 focus:ring-2 focus:ring-green-600/15 transition text-[15px] resize-y min-h-[140px] leading-relaxed" />
         <div className="text-[11.5px] text-inksoft mt-1 text-right tnum">{(blurbI18n[editLang] || "").length} {lang === "ru" ? "символов" : lang === "uz" ? "belgi" : "chars"}</div>
+      </label>
+
+      {/* near / landmark — public, shown next to the pin in the catalog */}
+      <label className="block mb-6">
+        <div className="flex items-center justify-between">
+          <span className="text-[13px] font-bold">{STR[lang].a_near}</span>
+          {langTabs}
+        </div>
+        <input value={nearI18n[editLang]} onChange={(e) => setNearI18n({ ...nearI18n, [editLang]: e.target.value })} placeholder={STR[lang].a_near_ph} className={fld} />
       </label>
 
       {/* location pick + exact address */}

@@ -43,7 +43,7 @@ export function AptCard({ apt, lang, STR, filters, onOpen, device, saved, onTogg
         </div>
         <h3 className="font-serif text-[18px] leading-snug mt-1 text-ink" style={{ textWrap: "balance" }}>{apt.title[lang]}</h3>
         <div className="flex items-center gap-2 mt-1.5 text-[13px] text-inksoft font-medium">
-          <Icon name="pin" size={14} /><span>{apt.near[lang]}</span>
+          <Icon name="pin" size={14} /><span>{apt.near?.[lang] || d[lang]}</span>
           <span className="text-line">·</span><span>{STR[lang].sleeps(apt.sleeps)}</span>
         </div>
         {nights > 0 && (
