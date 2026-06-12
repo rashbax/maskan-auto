@@ -4,14 +4,27 @@ import { useRouter } from "next/navigation";
 import { MASKAN } from "./data";
 import { Icon, Sheet } from "./ui";
 import { Catalog } from "./catalog";
-import { Detail } from "./detail";
-import { Booking } from "./booking";
 import { SavedPage, BookingsPage, AccountPage, BottomNav } from "./account";
 import { Admin } from "./admin";
 import { getApartments, getFavorites, getMyBookings, addFavorite, removeFavorite, getMyRole } from "./db";
 import { sb, mapUser, signInWithGoogle, signOut } from "./auth";
 
 const LANGS = ["uz", "ru", "en"];
+const DESKTOP_MIN_WIDTH = 760;
+
+function getDeviceMode() {
+  if (typeof window === "undefined") return "mobile";
+  const width = window.visualViewport?.width || window.innerWidth || document.documentElement.clientWidth || 0;
+  const screenMin = Math.min(window.screen?.width || width, window.screen?.height || width);
+  const coarseTouch = window.matchMedia?.("(hover: none) and (pointer: coarse)")?.matches || false;
+  const ua = navigator.userAgent || "";
+  const uaMobile = navigator.userAgentData?.mobile || /Android|iPhone|iPod|Mobile|Windows Phone/i.test(ua);
+
+  // Some Android browsers in "desktop site" mode report a wide layout viewport, but the
+  // physical CSS screen remains phone-sized. Keep those on the mobile app shell.
+  if (width < DESKTOP_MIN_WIDTH || uaMobile || (coarseTouch && screenMin < DESKTOP_MIN_WIDTH)) return "mobile";
+  return "desktop";
+}
 
 function LangSheet({ open, onClose, lang, setLang, STR, desktop }) {
   return (
@@ -30,17 +43,16 @@ function LangSheet({ open, onClose, lang, setLang, STR, desktop }) {
   );
 }
 
-export default function App({ initialAptId }) {
+export default function App() {
   const STR = MASKAN.STR;
   const router = useRouter();
   const [lang, setLang] = useState(() => {
     const saved = typeof window !== "undefined" ? localStorage.getItem("maskan_lang") : null;
     return ["uz", "ru", "en"].includes(saved) ? saved : "uz";
   });
-  const [device, setDevice] = useState(() => (typeof window !== "undefined" && window.innerWidth >= 760 ? "desktop" : "mobile"));
+  const [device, setDevice] = useState(getDeviceMode);
   const [route, setRoute] = useState({ screen: "catalog" });
   const [filters, setFilters] = useState({ range: { from: null, to: null }, guests: 2, district: null });
-  const [range, setRange] = useState({ from: null, to: null });
   const [langOpen, setLangOpen] = useState(false);
   const [saved, setSaved] = useState(() => new Set());
   const [auth, setAuth] = useState(null);
@@ -89,64 +101,46 @@ export default function App({ initialAptId }) {
   }, [auth?.id]);
 
   useEffect(() => {
-    const onResize = () => setDevice(window.innerWidth >= 760 ? "desktop" : "mobile");
+    const onResize = () => setDevice(getDeviceMode());
     window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
+    window.addEventListener("orientationchange", onResize);
+    window.visualViewport?.addEventListener("resize", onResize);
+    onResize();
+    return () => {
+      window.removeEventListener("resize", onResize);
+      window.removeEventListener("orientationchange", onResize);
+      window.visualViewport?.removeEventListener("resize", onResize);
+    };
   }, []);
-  useEffect(() => { window.scrollTo(0, 0); }, [route.screen, route.apt]);
+  useEffect(() => { window.scrollTo(0, 0); }, [route.screen]);
 
-  // On load: open a deep-linked apartment (/apartment/[id]) or restore the screen from the URL
-  // hash, and seed a history entry so Back walks in-app history instead of leaving the site.
+  // On load: restore the top-level screen from the URL hash + seed a history entry so Back walks
+  // in-app history (apartment detail is its own /apartment/[id] route, handled by Next).
   useEffect(() => {
-    if (initialAptId) {
-      window.history.replaceState({ screen: "detail", aptId: initialAptId }, "");
-      return; // the detail opens once apartments load (effect below)
-    }
     const top = (window.location.hash || "").replace(/^#/, "").split("/")[0];
     const screen = ["saved", "bookings", "account", "admin"].includes(top) ? top : "catalog";
     setRoute({ screen });
-    window.history.replaceState({ screen, aptId: null }, "");
+    window.history.replaceState({ screen }, "");
   }, []);
 
-  // open the deep-linked apartment once data is loaded
+  // Back/Forward buttons → restore the top-level screen from history state (forward nav via go()).
   useEffect(() => {
-    if (!initialAptId || !apartments) return;
-    const apt = apartments.find((a) => a.id === initialAptId);
-    if (apt) setRoute({ screen: "detail", apt });
-  }, [initialAptId, apartments]);
-
-  // Back/Forward buttons → restore the route from history state (forward nav is pushed by go()).
-  useEffect(() => {
-    const onPop = (e) => {
-      const s = e.state || { screen: "catalog" };
-      let screen = s.screen || "catalog";
-      let apt;
-      if (s.aptId) {
-        apt = (apartments || []).find((a) => a.id === s.aptId);
-        if (!apt && (screen === "detail" || screen === "booking")) screen = "catalog";
-      }
-      setRoute({ screen, apt });
-    };
+    const onPop = (e) => setRoute({ screen: (e.state && e.state.screen) || "catalog" });
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
-  }, [apartments]);
+  }, []);
 
   const openLang = () => setLangOpen(true);
   // forward navigation: update state + push a history entry (so Back returns here, in-app)
   const go = (next) => {
     setRoute(next);
-    let url;
-    if (next.screen === "detail" && next.apt) url = "/apartment/" + next.apt.id;
-    else if (["saved", "bookings", "account", "admin"].includes(next.screen)) url = "#" + next.screen;
-    else url = "/";
-    window.history.pushState({ screen: next.screen, aptId: next.apt?.id || null }, "", url);
+    const url = ["saved", "bookings", "account", "admin"].includes(next.screen) ? "#" + next.screen : "/";
+    window.history.pushState({ screen: next.screen }, "", url);
   };
-  const goBack = () => window.history.back();
   const goCatalog = () => go({ screen: "catalog" });
   const goAdmin = () => go({ screen: "admin" });
   // apartment detail is now its own SEO route (SSR) — navigate there instead of an in-SPA screen
   const openApt = (apt) => { router.push(lang === "uz" ? `/apartment/${apt.id}` : `/${lang}/apartment/${apt.id}`); };
-  const book = (apt, r) => { setRange(r); go({ screen: "booking", apt }); };
   const toggleSave = (id) => setSaved((s) => {
     const n = new Set(s);
     if (n.has(id)) { n.delete(id); if (auth) removeFavorite(id); }
@@ -155,19 +149,14 @@ export default function App({ initialAptId }) {
   });
   const login = () => signInWithGoogle(); // Telegram has its own button (bot-nonce flow)
   const logout = () => signOut();
-  const refreshApartments = () => getApartments().then(setApartments).catch(() => {});
-  const refreshMyBookings = () => getMyBookings().then(setMyBookings).catch(() => {});
-  const handleBooked = () => { refreshApartments(); refreshMyBookings(); };
 
   const GUEST_TABS = ["catalog", "saved", "bookings", "account"];
-  const navTab = ["detail", "booking"].includes(route.screen) ? "search" : route.screen === "catalog" ? "search" : route.screen;
+  const navTab = route.screen === "catalog" ? "search" : route.screen;
   const setTab = (key) => { key === "search" ? goCatalog() : go({ screen: key }); };
 
   const common = { lang, STR, device, openLang, tab: navTab, setTab };
   let screen;
   if (route.screen === "catalog") screen = <Catalog {...common} apartments={apartments} filters={filters} setFilters={setFilters} onOpen={openApt} saved={saved} toggleSave={toggleSave} />;
-  else if (route.screen === "detail") screen = <Detail {...common} apt={route.apt} range={range} setRange={setRange} onBack={goBack} onBook={book} saved={saved} toggleSave={toggleSave} auth={auth} onLogin={login} />;
-  else if (route.screen === "booking") screen = <Booking {...common} apt={route.apt} range={range} onBack={goBack} onHome={goCatalog} onBooked={handleBooked} />;
   else if (route.screen === "saved") screen = <SavedPage {...common} apartments={apartments} saved={saved} toggleSave={toggleSave} onOpen={openApt} auth={auth} onLogin={login} />;
   else if (route.screen === "bookings") screen = <BookingsPage {...common} auth={auth} onLogin={login} onOpen={openApt} onBookAgain={openApt} bookings={myBookings} apartments={apartments} />;
   else if (route.screen === "account") screen = <AccountPage {...common} auth={auth} onLogin={login} onLogout={logout} setLang={setLang} />;
