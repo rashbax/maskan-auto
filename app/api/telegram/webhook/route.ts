@@ -60,7 +60,7 @@ export async function POST(req: Request) {
       body: JSON.stringify({ callback_query_id: cb.id, text: upd ? "✅" : "Muddati oʻtgan" }),
     });
     const cbChat = cb.message?.chat?.id;
-    if (upd && cbChat) await send(cbChat, "✅ Maskan'ga kirdingiz! Brauzerga qaytishingiz mumkin.");
+    if (upd && cbChat) await send(cbChat, "🎉 Tayyor! Maskan'ga kirdingiz. Endi brauzerga qayting — sizni zoʻr kvartiralar kutyapti 🏡");
     return NextResponse.json({ ok: true });
   }
 
@@ -76,8 +76,8 @@ export async function POST(req: Request) {
       const sb = createAdminClient();
       const { data: row } = await sb.from("telegram_login").select("status").eq("nonce", nonce).single();
       if (row?.status === "pending") {
-        await send(chatId, "🔐 maskan-auto.vercel.app saytiga kirish soʻraldi.\n\nAgar buni SIZ boshlamagan boʻlsangiz, tasdiqlamang.", {
-          reply_markup: { inline_keyboard: [[{ text: "✅ Ha, bu men — kirish", callback_data: `login:${nonce}` }]] },
+        await send(chatId, "👋 Assalomu alaykum! Maskan'ga xush kelibsiz 🏡\n\nToshkent boʻylab eng qulay kunlik kvartiralar shu yerda. Hisobingizga kirsangiz — yoqqan kvartiralarni saqlash va bron qilish ancha oson boʻladi.\n\nDavom etamizmi? Pastdagi tugmani bosing 👇\n\nℹ️ Agar bu soʻrovni siz boshlamagan boʻlsangiz, shunchaki eʼtibor bermang — hech narsa boʻlmaydi.", {
+          reply_markup: { inline_keyboard: [[{ text: "✅ Ha, kirishni tasdiqlayman", callback_data: `login:${nonce}` }]] },
         });
         return NextResponse.json({ ok: true });
       }
