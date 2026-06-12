@@ -60,7 +60,7 @@ function ReviewCard({ r, lang, STR }) {
   );
 }
 
-function ReviewForm({ lang, STR, onSubmit, auth, onLogin, apartmentId }) {
+export function ReviewForm({ lang, STR, onSubmit, auth, onLogin, apartmentId }) {
   const [rating, setRating] = useState(0);
   const [cons, setCons] = useState("");
   const [comment, setComment] = useState("");

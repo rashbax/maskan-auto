@@ -4,6 +4,7 @@ import { MASKAN } from "@/maskan/data";
 import { MapView } from "@/maskan/maps";
 import { AptReserve } from "@/maskan/apt-reserve";
 import { Gallery } from "@/maskan/gallery";
+import { SaveButton, ReviewWidget } from "@/maskan/apt-actions";
 
 export type Locale = "uz" | "ru" | "en";
 export const LOCALES: Locale[] = ["uz", "ru", "en"];
@@ -98,7 +99,10 @@ export function ApartmentView({ apt, locale }: { apt: any; locale: Locale }) {
 
         <div className="grid lg:grid-cols-[1fr_360px] gap-10">
           <div>
-            <span className="text-[11px] font-bold tracking-[0.14em] uppercase text-green-700">{district} · {S.search_city}</span>
+            <div className="flex items-start justify-between gap-3">
+              <span className="text-[11px] font-bold tracking-[0.14em] uppercase text-green-700 pt-1.5">{district} · {S.search_city}</span>
+              <SaveButton aptId={apt.id} lang={locale} />
+            </div>
             <h1 className="font-serif text-[28px] md:text-[34px] leading-[1.12] mt-1.5" style={{ textWrap: "balance" }}>{name}</h1>
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 mt-3 text-[14px] text-inksoft font-medium">
               <span>★ {apt.rating.toFixed(2)} ({apt.reviews})</span>
@@ -149,9 +153,12 @@ export function ApartmentView({ apt, locale }: { apt: any; locale: Locale }) {
               <p className="text-[13px] text-green-900 bg-green-50 rounded-xl p-3.5 mt-3">{T.locNote[locale]}</p>
             </section>
 
-            {apt.reviewsList.length > 0 && (
-              <section className="mt-6 pt-6 border-t border-line">
-                <h2 className="font-serif text-[20px] mb-4">{S.reviews_title} · {apt.rating.toFixed(2)}</h2>
+            <section className="mt-6 pt-6 border-t border-line">
+              <div className="flex items-center justify-between gap-3 flex-wrap mb-4">
+                <h2 className="font-serif text-[20px]">{S.reviews_title}{apt.reviews > 0 ? ` · ${apt.rating.toFixed(2)}` : ""}</h2>
+                <ReviewWidget aptId={apt.id} lang={locale} />
+              </div>
+              {apt.reviewsList.length > 0 ? (
                 <div className="space-y-4">
                   {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                   {apt.reviewsList.slice(0, 6).map((r: any, i: number) => (
@@ -165,8 +172,19 @@ export function ApartmentView({ apt, locale }: { apt: any; locale: Locale }) {
                     </div>
                   ))}
                 </div>
-              </section>
-            )}
+              ) : (
+                <p className="text-[14px] text-inksoft">{locale === "ru" ? "Пока нет отзывов — оставьте первый." : locale === "en" ? "No reviews yet — be the first." : "Hali sharh yoʻq — birinchi boʻling."}</p>
+              )}
+            </section>
+
+            <section className="mt-6 pt-6 border-t border-line">
+              <h2 className="font-serif text-[20px] mb-1">{S.questions_title}</h2>
+              <p className="text-[13.5px] text-inksoft mb-4">{S.questions_sub}</p>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <a href={`https://wa.me/${M.CONTACT.wa}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center gap-2 h-12 px-5 rounded-full bg-white border border-line font-semibold text-[14.5px] hover:border-ink/30">WhatsApp</a>
+                <a href={`https://t.me/${M.CONTACT.tg}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center gap-2 h-12 px-5 rounded-full bg-green-700 text-cream font-semibold text-[14.5px] hover:bg-green-900">Telegram</a>
+              </div>
+            </section>
           </div>
 
           <aside className="lg:sticky lg:top-20 self-start">
