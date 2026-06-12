@@ -3,6 +3,7 @@ import Link from "next/link";
 import { MASKAN } from "@/maskan/data";
 import { MapView } from "@/maskan/maps";
 import { AptReserve } from "@/maskan/apt-reserve";
+import { Gallery } from "@/maskan/gallery";
 
 export type Locale = "uz" | "ru" | "en";
 export const LOCALES: Locale[] = ["uz", "ru", "en"];
@@ -85,14 +86,7 @@ export function ApartmentView({ apt, locale }: { apt: any; locale: Locale }) {
 
       <div className="max-w-6xl mx-auto px-4 md:px-8 py-6">
         {photos.length > 0 ? (
-          <div className="grid grid-cols-4 grid-rows-2 gap-2 h-[280px] md:h-[420px] rounded-3xl overflow-hidden mb-7">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <div className="col-span-2 row-span-2 relative"><img src={photos[0]} alt={name} className="w-full h-full object-cover" /></div>
-            {photos.slice(1, 5).map((u, i) => (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img key={i} src={u} alt={`${name} — ${i + 2}`} loading="lazy" className="w-full h-full object-cover" />
-            ))}
-          </div>
+          <Gallery photos={photos} name={name} />
         ) : (
           <div className="h-[240px] rounded-3xl bg-cream border border-line grid place-items-center text-inksoft mb-7">{T.noPhoto[locale]}</div>
         )}

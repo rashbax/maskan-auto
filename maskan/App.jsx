@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { MASKAN } from "./data";
 import { Icon, Sheet } from "./ui";
 import { Catalog } from "./catalog";
@@ -31,6 +32,7 @@ function LangSheet({ open, onClose, lang, setLang, STR, desktop }) {
 
 export default function App({ initialAptId }) {
   const STR = MASKAN.STR;
+  const router = useRouter();
   const [lang, setLang] = useState(() => {
     const saved = typeof window !== "undefined" ? localStorage.getItem("maskan_lang") : null;
     return ["uz", "ru", "en"].includes(saved) ? saved : "uz";
@@ -142,7 +144,8 @@ export default function App({ initialAptId }) {
   const goBack = () => window.history.back();
   const goCatalog = () => go({ screen: "catalog" });
   const goAdmin = () => go({ screen: "admin" });
-  const openApt = (apt) => { setRange(filters.range?.from ? filters.range : { from: null, to: null }); go({ screen: "detail", apt }); };
+  // apartment detail is now its own SEO route (SSR) — navigate there instead of an in-SPA screen
+  const openApt = (apt) => { router.push(lang === "uz" ? `/apartment/${apt.id}` : `/${lang}/apartment/${apt.id}`); };
   const book = (apt, r) => { setRange(r); go({ screen: "booking", apt }); };
   const toggleSave = (id) => setSaved((s) => {
     const n = new Set(s);
