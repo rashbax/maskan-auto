@@ -17,9 +17,10 @@ function useLang() {
 
 // Interactive booking island for the server-rendered apartment page: availability calendar +
 // reserve, reusing the existing Booking flow (opened as an overlay). Content above is SSR.
-export function AptReserve({ apt }) {
+export function AptReserve({ apt, lang: langProp }) {
   const STR = MASKAN.STR;
-  const lang = useLang();
+  const langLocal = useLang();
+  const lang = langProp || langLocal;
   const [busy, setBusy] = useState(new Set());
   const [range, setRange] = useState({ from: null, to: null });
   const [booking, setBooking] = useState(false);

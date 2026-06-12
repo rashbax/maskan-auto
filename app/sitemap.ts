@@ -16,6 +16,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       url: `${BASE}/apartment/${a.id}`,
       changeFrequency: "daily",
       priority: 0.8,
+      alternates: {
+        languages: {
+          uz: `${BASE}/apartment/${a.id}`,
+          ru: `${BASE}/ru/apartment/${a.id}`,
+          en: `${BASE}/en/apartment/${a.id}`,
+        },
+      },
     }));
   } catch {
     /* DB unavailable at build — still emit the home URL */
