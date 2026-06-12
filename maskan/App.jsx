@@ -31,7 +31,10 @@ function LangSheet({ open, onClose, lang, setLang, STR, desktop }) {
 
 export default function App() {
   const STR = MASKAN.STR;
-  const [lang, setLang] = useState("uz");
+  const [lang, setLang] = useState(() => {
+    const saved = typeof window !== "undefined" ? localStorage.getItem("maskan_lang") : null;
+    return ["uz", "ru", "en"].includes(saved) ? saved : "uz";
+  });
   const [device, setDevice] = useState(() => (typeof window !== "undefined" && window.innerWidth >= 760 ? "desktop" : "mobile"));
   const [route, setRoute] = useState({ screen: "catalog" });
   const [filters, setFilters] = useState({ range: { from: null, to: null }, guests: 2, district: null });
@@ -50,6 +53,9 @@ export default function App() {
       .catch((e) => { console.error("getApartments failed:", e); alive && setApartments([]); });
     return () => { alive = false; };
   }, []);
+
+  // remember the chosen language across refreshes
+  useEffect(() => { try { localStorage.setItem("maskan_lang", lang); } catch { /* ignore */ } }, [lang]);
 
   // Complete the Telegram bot-nonce login: the magic link redirects back with the session
   // tokens in the URL fragment (#access_token=…). The PKCE browser client ignores that, so
