@@ -29,7 +29,7 @@ function LangSheet({ open, onClose, lang, setLang, STR, desktop }) {
   );
 }
 
-export default function App() {
+export default function App({ initialAptId }) {
   const STR = MASKAN.STR;
   const [lang, setLang] = useState(() => {
     const saved = typeof window !== "undefined" ? localStorage.getItem("maskan_lang") : null;
@@ -93,14 +93,25 @@ export default function App() {
   }, []);
   useEffect(() => { window.scrollTo(0, 0); }, [route.screen, route.apt]);
 
-  // On load: restore the screen from the URL hash AND seed a history entry, so the browser
-  // Back button walks in-app history instead of leaving the site.
+  // On load: open a deep-linked apartment (/apartment/[id]) or restore the screen from the URL
+  // hash, and seed a history entry so Back walks in-app history instead of leaving the site.
   useEffect(() => {
+    if (initialAptId) {
+      window.history.replaceState({ screen: "detail", aptId: initialAptId }, "");
+      return; // the detail opens once apartments load (effect below)
+    }
     const top = (window.location.hash || "").replace(/^#/, "").split("/")[0];
     const screen = ["saved", "bookings", "account", "admin"].includes(top) ? top : "catalog";
     setRoute({ screen });
     window.history.replaceState({ screen, aptId: null }, "");
   }, []);
+
+  // open the deep-linked apartment once data is loaded
+  useEffect(() => {
+    if (!initialAptId || !apartments) return;
+    const apt = apartments.find((a) => a.id === initialAptId);
+    if (apt) setRoute({ screen: "detail", apt });
+  }, [initialAptId, apartments]);
 
   // Back/Forward buttons → restore the route from history state (forward nav is pushed by go()).
   useEffect(() => {
@@ -122,8 +133,10 @@ export default function App() {
   // forward navigation: update state + push a history entry (so Back returns here, in-app)
   const go = (next) => {
     setRoute(next);
-    const hashable = ["saved", "bookings", "account", "admin"].includes(next.screen);
-    const url = hashable ? "#" + next.screen : window.location.pathname + window.location.search;
+    let url;
+    if (next.screen === "detail" && next.apt) url = "/apartment/" + next.apt.id;
+    else if (["saved", "bookings", "account", "admin"].includes(next.screen)) url = "#" + next.screen;
+    else url = "/";
     window.history.pushState({ screen: next.screen, aptId: next.apt?.id || null }, "", url);
   };
   const goBack = () => window.history.back();

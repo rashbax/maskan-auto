@@ -18,9 +18,16 @@ const spectral = Spectral({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://maskan-auto.vercel.app"),
   title: "Maskan — Kunlik kvartiralar, Toshkent",
   description:
     "Haqiqiy rasmlar, halol narx, lahzada band qilish. Toshkentda kunlik kvartiralar — qoʻngʻiroqlarsiz.",
+  openGraph: {
+    title: "Maskan — Kunlik kvartiralar, Toshkent",
+    description: "Haqiqiy rasmlar, halol narx, lahzada band qilish. Toshkentda kunlik kvartiralar.",
+    type: "website",
+    locale: "uz_UZ",
+  },
 };
 
 export default function RootLayout({
