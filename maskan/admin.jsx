@@ -708,7 +708,7 @@ export function Admin({ lang, STR, device, onExit, openLang, role, auth, onLogin
   // reflect the open tab in the URL (#admin/list…) so a refresh returns here, not the dashboard
   useEffect(() => {
     const sub = tab === "dash" ? "#admin" : "#admin/" + tab;
-    if (window.location.hash !== sub) window.history.replaceState(null, "", sub);
+    if (window.location.hash !== sub) window.history.replaceState({ screen: "admin", aptId: null }, "", sub);
   }, [tab]);
 
   if (!auth) return <AdminGate lang={lang} STR={STR} onLogin={onLogin} onExit={onExit} />;

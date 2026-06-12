@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { MASKAN } from "./data";
 import { Icon, Sheet } from "./ui";
 import { Catalog } from "./catalog";
@@ -93,30 +93,44 @@ export default function App() {
   }, []);
   useEffect(() => { window.scrollTo(0, 0); }, [route.screen, route.apt]);
 
-  // restore a top-level screen from the URL hash, so a refresh keeps you put (e.g. admin).
-  // Admin appends its own sub-path (#admin/list), so match on the first hash segment.
+  // On load: restore the screen from the URL hash AND seed a history entry, so the browser
+  // Back button walks in-app history instead of leaving the site.
   useEffect(() => {
     const top = (window.location.hash || "").replace(/^#/, "").split("/")[0];
-    if (["saved", "bookings", "account", "admin"].includes(top)) setRoute({ screen: top });
+    const screen = ["saved", "bookings", "account", "admin"].includes(top) ? top : "catalog";
+    setRoute({ screen });
+    window.history.replaceState({ screen, aptId: null }, "");
   }, []);
-  // keep the hash in sync with the current top-level screen (detail/booking carry an object → not
-  // hashable). Skip the first run and never clobber a deeper hash Admin already owns (#admin/list).
-  const hashSynced = useRef(false);
+
+  // Back/Forward buttons → restore the route from history state (forward nav is pushed by go()).
   useEffect(() => {
-    if (!hashSynced.current) { hashSynced.current = true; return; }
-    const s = route.screen;
-    if (!["catalog", "saved", "bookings", "account", "admin"].includes(s)) return;
-    const curTop = (window.location.hash || "").replace(/^#/, "").split("/")[0];
-    if (curTop === s) return;
-    const want = s === "catalog" ? "" : "#" + s;
-    window.history.replaceState(null, "", want || window.location.pathname + window.location.search);
-  }, [route.screen]);
+    const onPop = (e) => {
+      const s = e.state || { screen: "catalog" };
+      let screen = s.screen || "catalog";
+      let apt;
+      if (s.aptId) {
+        apt = (apartments || []).find((a) => a.id === s.aptId);
+        if (!apt && (screen === "detail" || screen === "booking")) screen = "catalog";
+      }
+      setRoute({ screen, apt });
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, [apartments]);
 
   const openLang = () => setLangOpen(true);
-  const goCatalog = () => setRoute({ screen: "catalog" });
-  const goAdmin = () => setRoute({ screen: "admin" });
-  const openApt = (apt) => { setRange(filters.range?.from ? filters.range : { from: null, to: null }); setRoute({ screen: "detail", apt }); };
-  const book = (apt, r) => { setRange(r); setRoute({ screen: "booking", apt }); };
+  // forward navigation: update state + push a history entry (so Back returns here, in-app)
+  const go = (next) => {
+    setRoute(next);
+    const hashable = ["saved", "bookings", "account", "admin"].includes(next.screen);
+    const url = hashable ? "#" + next.screen : window.location.pathname + window.location.search;
+    window.history.pushState({ screen: next.screen, aptId: next.apt?.id || null }, "", url);
+  };
+  const goBack = () => window.history.back();
+  const goCatalog = () => go({ screen: "catalog" });
+  const goAdmin = () => go({ screen: "admin" });
+  const openApt = (apt) => { setRange(filters.range?.from ? filters.range : { from: null, to: null }); go({ screen: "detail", apt }); };
+  const book = (apt, r) => { setRange(r); go({ screen: "booking", apt }); };
   const toggleSave = (id) => setSaved((s) => {
     const n = new Set(s);
     if (n.has(id)) { n.delete(id); if (auth) removeFavorite(id); }
@@ -131,13 +145,13 @@ export default function App() {
 
   const GUEST_TABS = ["catalog", "saved", "bookings", "account"];
   const navTab = ["detail", "booking"].includes(route.screen) ? "search" : route.screen === "catalog" ? "search" : route.screen;
-  const setTab = (key) => { key === "search" ? goCatalog() : setRoute({ screen: key }); };
+  const setTab = (key) => { key === "search" ? goCatalog() : go({ screen: key }); };
 
   const common = { lang, STR, device, openLang, tab: navTab, setTab };
   let screen;
   if (route.screen === "catalog") screen = <Catalog {...common} apartments={apartments} filters={filters} setFilters={setFilters} onOpen={openApt} saved={saved} toggleSave={toggleSave} />;
-  else if (route.screen === "detail") screen = <Detail {...common} apt={route.apt} range={range} setRange={setRange} onBack={goCatalog} onBook={book} saved={saved} toggleSave={toggleSave} auth={auth} onLogin={login} />;
-  else if (route.screen === "booking") screen = <Booking {...common} apt={route.apt} range={range} onBack={() => setRoute({ screen: "detail", apt: route.apt })} onHome={goCatalog} onBooked={handleBooked} />;
+  else if (route.screen === "detail") screen = <Detail {...common} apt={route.apt} range={range} setRange={setRange} onBack={goBack} onBook={book} saved={saved} toggleSave={toggleSave} auth={auth} onLogin={login} />;
+  else if (route.screen === "booking") screen = <Booking {...common} apt={route.apt} range={range} onBack={goBack} onHome={goCatalog} onBooked={handleBooked} />;
   else if (route.screen === "saved") screen = <SavedPage {...common} apartments={apartments} saved={saved} toggleSave={toggleSave} onOpen={openApt} auth={auth} onLogin={login} />;
   else if (route.screen === "bookings") screen = <BookingsPage {...common} auth={auth} onLogin={login} onOpen={openApt} onBookAgain={openApt} bookings={myBookings} apartments={apartments} />;
   else if (route.screen === "account") screen = <AccountPage {...common} auth={auth} onLogin={login} onLogout={logout} setLang={setLang} />;
