@@ -1,6 +1,7 @@
 // ============ Maskan — mock data + i18n (UZ / RU / EN) ============
 
-const TODAY = new Date(2026, 5, 8); // 8 June 2026 (months are 0-indexed)
+// real "today" at local midnight — drives the calendar min date + past-date blocking
+const TODAY = (() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; })();
 
 const iso = (d) => {
   const y = d.getFullYear();

@@ -19,6 +19,11 @@ jobs:
         run: npm run typecheck
       - name: Build
         run: npm run build
+        env:
+          # generateStaticParams / sitemap reach Supabase at build. Map repo secrets when set;
+          # the code also degrades gracefully (empty list) if they're absent.
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
       - name: Security audit (non-blocking)
         run: npm audit --omit=dev --audit-level=high
         continue-on-error: true

@@ -84,7 +84,7 @@ export function ApartmentView({ apt, locale }: { apt: any; locale: Locale }) {
 
   return (
     <div className="min-h-screen bg-canvas">
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(ld) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(ld).replace(/</g, "\\u003c") }} />
       <header className="sticky top-0 z-30 bg-canvas/90 backdrop-blur border-b border-line">
         <div className="max-w-6xl mx-auto px-4 md:px-8 h-14 flex items-center gap-2.5">
           <Link href={home} aria-label={T.catalog[locale]} className="inline-flex items-center gap-1.5 -ml-1 pr-2 h-9 rounded-full text-[14px] font-semibold hover:opacity-70">

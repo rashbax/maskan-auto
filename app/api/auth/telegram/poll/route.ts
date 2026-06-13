@@ -37,10 +37,12 @@ export async function GET(req: NextRequest) {
   const { data: claimed } = await sb.from("telegram_login").delete().eq("nonce", nonce).eq("status", "confirmed").select().maybeSingle();
   if (!claimed) return NextResponse.json({ status: "pending" }, { headers: NO_STORE });
 
-  // public origin from proxy headers (Vercel req.url host is the internal host)
+  // Pin the magic-link origin to a trusted, fixed site URL so a forged x-forwarded-host can't
+  // redirect the one-time link to an attacker domain. Fall back to the request host only in
+  // local dev (where SITE_URL isn't set).
   const host = req.headers.get("x-forwarded-host") || req.headers.get("host") || req.nextUrl.host;
   const proto = req.headers.get("x-forwarded-proto") || (host.includes("localhost") ? "http" : "https");
-  const origin = `${proto}://${host}`;
+  const origin = process.env.SITE_URL || `${proto}://${host}`;
 
   const link = await mintTelegramSession(
     { id: claimed.telegram_id, first_name: claimed.first_name, last_name: claimed.last_name, username: claimed.username, photo_url: claimed.photo_url },

@@ -10,8 +10,12 @@ export const revalidate = 3600;
 export const dynamicParams = true;
 
 export async function generateStaticParams() {
-  const { data } = await publicDb().from("apartments").select("id").eq("status", "active");
-  return (data ?? []).map((a) => ({ id: a.id as string }));
+  try {
+    const { data } = await publicDb().from("apartments").select("id").eq("status", "active");
+    return (data ?? []).map((a) => ({ id: a.id as string }));
+  } catch {
+    return []; // no DB env (e.g. CI) — pages still render on-demand via ISR
+  }
 }
 
 export async function generateMetadata({ params }: Params): Promise<Metadata> {

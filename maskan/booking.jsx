@@ -128,8 +128,9 @@ export function Booking({ apt, range, lang, STR, device, onBack, onHome, onBooke
   }
   async function finishOtp() {
     setStep("confirming");
+    let id;
     try {
-      const id = await createBooking({
+      id = await createBooking({
         apartmentId: apt.id,
         guestName: form.name,
         phone: form.phone,
@@ -141,16 +142,19 @@ export function Booking({ apt, range, lang, STR, device, onBack, onHome, onBooke
         to: range.to,
         price: apt.price,
       });
-      setBookingId(id);
-      onBooked && onBooked(); // refresh availability so the dates show as busy
-      // notify the owner (server-side; graceful no-op if the bot isn't configured yet)
-      fetch("/api/notify-booking", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) }).catch(() => {});
-      // mirror to Beds24 so the dates close on connected OTAs (no-op until Beds24 is configured)
-      fetch("/api/beds24/push-booking", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) }).catch(() => {});
     } catch (e) {
+      // The dates were NOT held (overlap / RLS / network) — never show a fake confirmation.
       console.error("createBooking failed:", e);
-      // optimistic: still confirm to the guest; the dates were held and the host follows up
+      submittingRef.current = false; // allow a retry
+      setStep("error");
+      return;
     }
+    setBookingId(id);
+    onBooked && onBooked(); // refresh availability so the dates show as busy
+    // notify the owner (server-side; graceful no-op if the bot isn't configured yet)
+    fetch("/api/notify-booking", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) }).catch(() => {});
+    // mirror to Beds24 so the dates close on connected OTAs (no-op until Beds24 is configured)
+    fetch("/api/beds24/push-booking", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) }).catch(() => {});
     setTimeout(() => setStep("done"), 600);
   }
 
@@ -206,6 +210,14 @@ export function Booking({ apt, range, lang, STR, device, onBack, onHome, onBooke
         <div className="py-20 text-center fade-up">
           <div className="w-12 h-12 mx-auto rounded-full border-[3px] border-green-600/25 border-t-green-700 animate-spin" />
           <p className="text-[14px] text-inksoft mt-4">{lang === "ru" ? "Закрепляем даты…" : lang === "uz" ? "Sanalar saqlanmoqda…" : "Securing your dates…"}</p>
+        </div>
+      )}
+      {step === "error" && (
+        <div className="py-16 text-center fade-up">
+          <div className="w-16 h-16 mx-auto rounded-full bg-red-50 text-red-600 grid place-items-center text-[32px] font-bold">!</div>
+          <h2 className="font-serif text-[22px] mt-4">{lang === "ru" ? "Не удалось забронировать" : lang === "uz" ? "Bron qilib boʻlmadi" : "Booking failed"}</h2>
+          <p className="text-[14px] text-inksoft mt-2 px-6">{lang === "ru" ? "Возможно, эти даты только что заняли. Выберите другие даты или попробуйте ещё раз." : lang === "uz" ? "Ehtimol bu sanalar hozirgina band boʻldi. Boshqa sana tanlang yoki qayta urinib koʻring." : "These dates may have just been taken. Pick other dates or try again."}</p>
+          <div className="mt-6"><Button full size="lg" onClick={() => setStep("form")}>{lang === "ru" ? "Назад" : lang === "uz" ? "Orqaga" : "Back"}</Button></div>
         </div>
       )}
       {step === "done" && <Confirmation apt={apt} range={range} form={form} lang={lang} STR={STR} onHome={onHome} bookingId={bookingId} />}

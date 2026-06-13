@@ -22,8 +22,16 @@ export async function POST(req: Request) {
   if (!id) return NextResponse.json({ error: "no_id" }, { status: 400 });
 
   const sb = createAdminClient();
-  const { data: b } = await sb.from("bookings").select("*").eq("id", id).single();
-  if (!b) return NextResponse.json({ error: "not_found" }, { status: 404 });
+  // Atomically claim the notification (notified_at was null) so a replay or concurrent call
+  // can't re-send and spam the host. Only the first caller gets the row back.
+  const { data: b } = await sb
+    .from("bookings")
+    .update({ notified_at: new Date().toISOString() })
+    .eq("id", id)
+    .is("notified_at", null)
+    .select("*")
+    .maybeSingle();
+  if (!b) return NextResponse.json({ skipped: "already_notified_or_missing" });
   const { data: apt } = await sb.from("apartments").select("title,district").eq("id", b.apartment_id).single();
 
   const title = apt?.title?.uz || apt?.title?.ru || apt?.title?.en || b.apartment_id;

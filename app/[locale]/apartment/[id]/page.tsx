@@ -12,9 +12,13 @@ export const revalidate = 3600;
 export const dynamicParams = true;
 
 export async function generateStaticParams() {
-  const { data } = await publicDb().from("apartments").select("id").eq("status", "active");
-  const ids = (data ?? []).map((a) => a.id as string);
-  return LOCALES.flatMap((locale) => ids.map((id) => ({ locale, id })));
+  try {
+    const { data } = await publicDb().from("apartments").select("id").eq("status", "active");
+    const ids = (data ?? []).map((a) => a.id as string);
+    return LOCALES.flatMap((locale) => ids.map((id) => ({ locale, id })));
+  } catch {
+    return []; // no DB env (e.g. CI) — pages still render on-demand via ISR
+  }
 }
 
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
