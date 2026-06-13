@@ -122,3 +122,10 @@ body {
   background-image: radial-gradient(rgba(20, 64, 47, 0.04) 1px, transparent 1px);
   background-size: 14px 14px;
 }
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
