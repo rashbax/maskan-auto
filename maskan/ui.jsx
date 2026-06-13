@@ -195,9 +195,10 @@ export const AMENITY_ICON = { wifi: "wifi", ac: "ac", kitchen: "kitchen", washer
 
 // ---------------- Contact channel button (WhatsApp / Telegram) ----------------
 export const waHref = (text) => `https://wa.me/${MASKAN.CONTACT.wa}${text ? `?text=${encodeURIComponent(text)}` : ""}`;
-// Telegram contact goes via the bot so it can identify the apartment (start=<aptId>_<lang>),
-// greet the guest, and route them to the host. No aptId → a plain bot chat.
-export const tgHref = (aptId, lang) => `https://t.me/${MASKAN.CONTACT.bot}${aptId ? `?start=${aptId}_${lang || "uz"}` : ""}`;
+// With an apartment → go via the bot so it can identify the place (start=<aptId>_<lang>) and
+// hand off to the host. Without one (general question) → straight to the personal Telegram.
+export const tgHref = (aptId, lang) =>
+  aptId ? `https://t.me/${MASKAN.CONTACT.bot}?start=${aptId}_${lang || "uz"}` : `https://t.me/${MASKAN.CONTACT.tg}`;
 
 export function ChannelBtn({ channel, lang, STR, variant = "outline", full, size = "md", text, aptId, children }) {
   const isWa = channel === "whatsapp";

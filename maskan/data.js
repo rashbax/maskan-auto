@@ -349,8 +349,10 @@ const STR = {
 
 export const MASKAN = {
   TODAY, iso, addDays, APARTMENTS, BOOKINGS, GUEST_BOOKINGS, AMENITIES, DISTRICTS, TONES, STR,
-  // Customer-facing contact. Telegram goes through the bot so it can identify the apartment
-  // (start=<aptId>_<lang>), greet the guest, and hand off to the host's personal chat
-  // (TELEGRAM_OWNER_CONTACT, used server-side in the webhook). WhatsApp is a direct number.
-  CONTACT: { wa: "998901234567", bot: "maskan_tashkentbot" },
+  // Customer-facing contact.
+  //  - tg  : personal Telegram (by phone) for GENERAL questions — direct, no bot.
+  //  - bot : login bot username; used only for APARTMENT enquiries (start=<aptId>_<lang>),
+  //          where it greets by apartment name and hands off to the host.
+  //  - wa  : direct WhatsApp number.
+  CONTACT: { wa: "998901234567", tg: "+998940026056", bot: "maskan_tashkentbot" },
 };
