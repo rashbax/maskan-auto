@@ -44,7 +44,8 @@ export async function POST(req: Request) {
   const nights = Math.round((Date.parse(to) - Date.parse(from)) / DAY);
   if (nights < 1 || nights > MAX_NIGHTS) return NextResponse.json({ error: "bad_dates" }, { status: 400 });
   const todayTashkent = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tashkent" }).format(new Date());
-  const horizon = new Date(Date.now() + HORIZON_DAYS * DAY).toISOString().slice(0, 10);
+  // horizon on the same Tashkent basis as todayTashkent (avoids a UTC/Tashkent off-by-one)
+  const horizon = new Date(Date.parse(todayTashkent + "T00:00:00Z") + HORIZON_DAYS * DAY).toISOString().slice(0, 10);
   if (from < todayTashkent) return NextResponse.json({ error: "past_date" }, { status: 400 });
   if (from > horizon) return NextResponse.json({ error: "too_far" }, { status: 400 });
   if (!guestName) return NextResponse.json({ error: "name_required" }, { status: 400 });
@@ -98,9 +99,9 @@ export async function POST(req: Request) {
     status: "active",
   });
   if (error) {
-    // overlap (23P01 exclusion) or owner-blocked dates (23514 from the block trigger) — the dates
-    // were taken between the check and the insert.
-    if (error.code === "23P01" || error.code === "23514") return NextResponse.json({ error: "unavailable" }, { status: 409 });
+    // overlap (23P01 exclusion) or owner-blocked dates (23B01 from the block trigger) — the dates
+    // were taken between the check and the insert. A real check failure (23514) is NOT masked here.
+    if (error.code === "23P01" || error.code === "23B01") return NextResponse.json({ error: "unavailable" }, { status: 409 });
     console.error("book insert failed:", error);
     return NextResponse.json({ error: "insert_failed" }, { status: 500 });
   }

@@ -43,7 +43,7 @@ async function b24<T>(path: string, init: RequestInit = {}): Promise<T> {
 // refresh token. Run once (e.g. from /api/beds24/diag?setup=<code>), then store the returned
 // refreshToken in BEDS24_REFRESH_TOKEN. Refresh tokens are long-lived; keep it secret.
 export async function setupFromInviteCode(code: string, deviceName = "maskan-site") {
-  const res = await fetch(`${BASE}/authentication/setup`, { headers: { code, deviceName } });
+  const res = await fetch(`${BASE}/authentication/setup`, { headers: { code, deviceName }, signal: AbortSignal.timeout(8000) });
   if (!res.ok) throw new Error(`beds24_setup_failed_${res.status}`);
   return (await res.json()) as { token: string; refreshToken: string; expiresIn: number };
 }

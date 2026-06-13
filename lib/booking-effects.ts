@@ -85,10 +85,7 @@ export async function pushToBeds24(id: string) {
       detail: detail.slice(0, 500),
     });
 
-  if (!roomId) {
-    await log(false, "apartment not mapped to a Beds24 room");
-    return;
-  }
+  if (!roomId) return; // apartment isn't connected to Beds24 — expected, nothing to mirror
 
   try {
     const resp = await pushBooking({
