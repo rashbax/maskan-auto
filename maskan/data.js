@@ -349,5 +349,7 @@ const STR = {
 
 export const MASKAN = {
   TODAY, iso, addDays, APARTMENTS, BOOKINGS, GUEST_BOOKINGS, AMENITIES, DISTRICTS, TONES, STR,
-  CONTACT: { wa: "998901234567", tg: "maskan_tashkentbot" },
+  // Customer-facing contact. `tg` is a personal Telegram (by phone) — NOT the login/notify bot,
+  // which lives in env (BOT / TELEGRAM_OWNER_CHAT_ID) and is unaffected by this.
+  CONTACT: { wa: "998901234567", tg: "+998940026056" },
 };
