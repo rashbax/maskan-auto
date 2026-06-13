@@ -6,7 +6,8 @@ export const runtime = "nodejs";
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const SECRET = process.env.TELEGRAM_WEBHOOK_SECRET;
 const OWNER = process.env.TELEGRAM_OWNER_CHAT_ID;
-const OWNER_TG = process.env.TELEGRAM_OWNER_CONTACT || "+998940026056"; // host's personal Telegram (by phone)
+// host's personal Telegram for the hand-off button. Accepts "@username", "username" or "+phone".
+const OWNER_TG = (process.env.TELEGRAM_OWNER_CONTACT || "+998940026056").replace(/^@/, "");
 
 async function send(chatId: number | string, text: string, extra: Record<string, unknown> = {}) {
   await fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
@@ -45,6 +46,13 @@ const ENQUIRY = {
   uz: { greet: (t: string) => `🏡 ${t}\n\nShu kvartira boʻyicha soʻrovingiz qabul qilindi. Egamizga toʻgʻridan-toʻgʻri yozish uchun pastdagi tugmani bosing 👇`, btn: "✍️ Egaga yozish" },
   ru: { greet: (t: string) => `🏡 ${t}\n\nВаш запрос по этой квартире принят. Чтобы написать хозяину напрямую, нажмите кнопку ниже 👇`, btn: "✍️ Написать хозяину" },
   en: { greet: (t: string) => `🏡 ${t}\n\nWe received your enquiry about this apartment. Tap below to message the host directly 👇`, btn: "✍️ Message the host" },
+} as const;
+
+// Post-booking: the guest tapped Telegram on the confirmation to get keys/address for a booking.
+const BOOK = {
+  uz: { line: "Kalit va manzil uchun egamizga yozing 👇", btn: "✍️ Egaga yozish" },
+  ru: { line: "Напишите хозяину для получения ключей и адреса 👇", btn: "✍️ Написать хозяину" },
+  en: { line: "Message the host for keys and the address 👇", btn: "✍️ Message the host" },
 } as const;
 
 // Telegram bot webhook. Confirms a website login ONLY after the user taps an explicit consent
@@ -102,6 +110,30 @@ export async function POST(req: Request) {
   // --- /start <payload> ---
   if (text.startsWith("/start ")) {
     const payload = text.split(/\s+/)[1] || "";
+
+    // (A0) post-booking deep-link: start=book_<bookingId>_<lang> → keys/address with full context
+    if (payload.startsWith("book_")) {
+      const rest = payload.slice("book_".length);
+      const u = rest.lastIndexOf("_");
+      const bookingId = u === -1 ? rest : rest.slice(0, u);
+      const lng = u === -1 ? "uz" : rest.slice(u + 1);
+      const lang = (["uz", "ru", "en"].includes(lng) ? lng : "uz") as keyof typeof BOOK;
+      const sb = createAdminClient();
+      const { data: bk } = await sb.from("bookings").select("apartment_id, checkin, checkout").eq("id", bookingId).single();
+      let title = bookingId;
+      if (bk?.apartment_id) {
+        const { data: apt } = await sb.from("apartments").select("title").eq("id", bk.apartment_id).single();
+        title = (apt?.title as Record<string, string> | null)?.[lang] || (apt?.title as Record<string, string> | null)?.uz || bk.apartment_id;
+      }
+      const dates = bk ? `\n📅 ${bk.checkin} → ${bk.checkout}` : "";
+      const b = BOOK[lang];
+      await send(chatId, `🔑 ${title}${dates}\n🔖 ${bookingId}\n\n${b.line}`, { reply_markup: { inline_keyboard: [[{ text: b.btn, url: `https://t.me/${OWNER_TG}` }]] } });
+      if (OWNER && String(chatId) !== String(OWNER)) {
+        const who = `${msg?.from?.first_name || ""} ${msg?.from?.username ? "@" + msg.from.username : ""}`.trim() || `id ${chatId}`;
+        await send(OWNER, `🔑 Kalit/aloqa soʻrovi\n🏠 ${title}${dates}\n🔖 ${bookingId}\n👤 ${who}`);
+      }
+      return NextResponse.json({ ok: true });
+    }
 
     // (A) apartment enquiry deep-link: start=<aptId>_<lang> → greet the guest + hand off to host
     if (payload.startsWith("apt-")) {

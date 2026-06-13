@@ -1,44 +1,57 @@
 import { NextResponse } from "next/server";
+import { timingSafeEqual } from "crypto";
 import { beds24Enabled, validateToken, setupFromInviteCode, getProperties } from "@/lib/beds24";
 
 export const runtime = "nodejs";
 
 const KEY = process.env.BEDS24_DIAG_KEY;
 
-// Admin smoke-test / one-time setup for the Beds24 connection. Fail-closed: needs BEDS24_DIAG_KEY.
-//   GET /api/beds24/diag?key=...            -> { enabled, validToken }
-//   GET /api/beds24/diag?key=...&setup=CODE -> exchange an invite code for a refresh token (once)
+const json = (body: unknown, status = 200) =>
+  NextResponse.json(body, { status, headers: { "Cache-Control": "no-store" } });
+
+function keyOk(provided: string | null): boolean {
+  if (!KEY || !provided) return false;
+  const a = Buffer.from(provided);
+  const b = Buffer.from(KEY);
+  return a.length === b.length && timingSafeEqual(a, b);
+}
+
+// Read-only checks — no long-lived secret in the response, so a query key is acceptable here.
+//   GET /api/beds24/diag?key=...          -> { enabled, validToken }
+//   GET /api/beds24/diag?key=...&props=1  -> properties + rooms (read off propertyId / roomId)
 export async function GET(req: Request) {
-  if (!KEY) return NextResponse.json({ error: "diag_disabled" }, { status: 503 });
+  if (!KEY) return json({ error: "diag_disabled" }, 503);
   const url = new URL(req.url);
-  if (url.searchParams.get("key") !== KEY) return NextResponse.json({ error: "forbidden" }, { status: 403 });
+  if (!keyOk(url.searchParams.get("key"))) return json({ error: "forbidden" }, 403);
 
-  const setup = url.searchParams.get("setup");
-  if (setup) {
-    try {
-      const t = await setupFromInviteCode(setup);
-      // Shown once so it can be copied into BEDS24_REFRESH_TOKEN — never logged elsewhere.
-      return NextResponse.json({ refreshToken: t.refreshToken, expiresIn: t.expiresIn });
-    } catch (e) {
-      return NextResponse.json({ error: String(e) }, { status: 502 });
-    }
-  }
-
-  // ?props=1 → list properties + rooms so you can read off propertyId / roomId
-  if (url.searchParams.get("props")) {
-    if (!beds24Enabled()) return NextResponse.json({ enabled: false });
-    try {
-      return NextResponse.json(await getProperties());
-    } catch (e) {
-      return NextResponse.json({ error: String(e) }, { status: 502 });
-    }
-  }
-
-  if (!beds24Enabled()) return NextResponse.json({ enabled: false });
+  if (!beds24Enabled()) return json({ enabled: false });
   try {
+    if (url.searchParams.get("props")) return json(await getProperties());
     const v = await validateToken();
-    return NextResponse.json({ enabled: true, validToken: v.validToken });
+    return json({ enabled: true, validToken: v.validToken });
   } catch (e) {
-    return NextResponse.json({ enabled: true, error: String(e) }, { status: 502 });
+    return json({ enabled: true, error: String(e) }, 502);
+  }
+}
+
+// One-time invite-code → refresh-token exchange. The refresh token is long-lived and powerful, so
+// keep it out of URLs/history/logs: key goes in a header, invite code in the body, never cached.
+//   curl -X POST https://maskan-auto.vercel.app/api/beds24/diag \
+//        -H "x-beds24-diag-key: <KEY>" -H "content-type: application/json" -d '{"code":"<INVITE>"}'
+export async function POST(req: Request) {
+  if (!KEY) return json({ error: "diag_disabled" }, 503);
+  if (!keyOk(req.headers.get("x-beds24-diag-key"))) return json({ error: "forbidden" }, 403);
+  let code: string | undefined;
+  try {
+    code = (await req.json())?.code;
+  } catch {
+    /* no/!json body */
+  }
+  if (!code) return json({ error: "no_code" }, 400);
+  try {
+    const t = await setupFromInviteCode(code);
+    return json({ refreshToken: t.refreshToken, expiresIn: t.expiresIn });
+  } catch (e) {
+    return json({ error: String(e) }, 502);
   }
 }
