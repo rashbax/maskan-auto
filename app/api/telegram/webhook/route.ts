@@ -6,8 +6,6 @@ export const runtime = "nodejs";
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const SECRET = process.env.TELEGRAM_WEBHOOK_SECRET;
 const OWNER = process.env.TELEGRAM_OWNER_CHAT_ID;
-// host's personal Telegram for the hand-off button. Accepts "@username", "username" or "+phone".
-const OWNER_TG = (process.env.TELEGRAM_OWNER_CONTACT || "+998940026056").replace(/^@/, "");
 
 async function send(chatId: number | string, text: string, extra: Record<string, unknown> = {}) {
   await fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
@@ -39,20 +37,20 @@ const CONSENT = {
 
 const pick = (lang?: string) => CONSENT[(lang as keyof typeof CONSENT)] || CONSENT.uz;
 
-// Apartment enquiry: the guest tapped "Telegram" on an apartment, so we greet them by the
-// apartment name and hand off to the host's personal chat (the bot can't relay context into
-// that chat, so it also pings the host with who + which apartment).
+// Apartment enquiry: the guest tapped "Telegram" on an apartment. We greet by apartment name and
+// invite them to write here — the bot remembers the apartment (telegram_contact) and tags every
+// relayed message with it, so the operator always sees which apartment the message is about.
 const ENQUIRY = {
-  uz: { greet: (t: string) => `🏡 ${t}\n\nShu kvartira boʻyicha soʻrovingiz qabul qilindi. Egamizga toʻgʻridan-toʻgʻri yozish uchun pastdagi tugmani bosing 👇`, btn: "✍️ Egaga yozish" },
-  ru: { greet: (t: string) => `🏡 ${t}\n\nВаш запрос по этой квартире принят. Чтобы написать хозяину напрямую, нажмите кнопку ниже 👇`, btn: "✍️ Написать хозяину" },
-  en: { greet: (t: string) => `🏡 ${t}\n\nWe received your enquiry about this apartment. Tap below to message the host directly 👇`, btn: "✍️ Message the host" },
+  uz: (t: string) => `🏡 ${t}\n\nShu kvartira boʻyicha savolingizni shu yerga yozing — egamiz tez orada javob beradi.`,
+  ru: (t: string) => `🏡 ${t}\n\nНапишите ваш вопрос об этой квартире прямо здесь — хозяин скоро ответит.`,
+  en: (t: string) => `🏡 ${t}\n\nWrite your question about this apartment here — the host will reply shortly.`,
 } as const;
 
 // Post-booking: the guest tapped Telegram on the confirmation to get keys/address for a booking.
 const BOOK = {
-  uz: { line: "Kalit va manzil uchun egamizga yozing 👇", btn: "✍️ Egaga yozish" },
-  ru: { line: "Напишите хозяину для получения ключей и адреса 👇", btn: "✍️ Написать хозяину" },
-  en: { line: "Message the host for keys and the address 👇", btn: "✍️ Message the host" },
+  uz: "Kalit va manzil uchun savolingizni shu yerga yozing — egamiz javob beradi.",
+  ru: "Напишите здесь для получения ключей и адреса — хозяин ответит.",
+  en: "Write here for keys and the address — the host will reply.",
 } as const;
 
 // Telegram bot webhook. Confirms a website login ONLY after the user taps an explicit consent
@@ -121,17 +119,15 @@ export async function POST(req: Request) {
       const sb = createAdminClient();
       const { data: bk } = await sb.from("bookings").select("apartment_id, checkin, checkout").eq("id", bookingId).single();
       let title = bookingId;
+      let aptId: string | null = null;
       if (bk?.apartment_id) {
+        aptId = bk.apartment_id;
         const { data: apt } = await sb.from("apartments").select("title").eq("id", bk.apartment_id).single();
         title = (apt?.title as Record<string, string> | null)?.[lang] || (apt?.title as Record<string, string> | null)?.uz || bk.apartment_id;
       }
       const dates = bk ? `\n📅 ${bk.checkin} → ${bk.checkout}` : "";
-      const b = BOOK[lang];
-      await send(chatId, `🔑 ${title}${dates}\n🔖 ${bookingId}\n\n${b.line}`, { reply_markup: { inline_keyboard: [[{ text: b.btn, url: `https://t.me/${OWNER_TG}` }]] } });
-      if (OWNER && String(chatId) !== String(OWNER)) {
-        const who = `${msg?.from?.first_name || ""} ${msg?.from?.username ? "@" + msg.from.username : ""}`.trim() || `id ${chatId}`;
-        await send(OWNER, `🔑 Kalit/aloqa soʻrovi\n🏠 ${title}${dates}\n🔖 ${bookingId}\n👤 ${who}`);
-      }
+      await sb.from("telegram_contact").upsert({ chat_id: String(chatId), apartment_id: aptId, title, booking_id: bookingId, updated_at: new Date().toISOString() });
+      await send(chatId, `🔑 ${title}${dates}\n🔖 ${bookingId}\n\n${BOOK[lang]}`);
       return NextResponse.json({ ok: true });
     }
 
@@ -144,12 +140,8 @@ export async function POST(req: Request) {
       const sb = createAdminClient();
       const { data: apt } = await sb.from("apartments").select("title").eq("id", aptId).single();
       const title = (apt?.title as Record<string, string> | null)?.[lang] || (apt?.title as Record<string, string> | null)?.uz || aptId;
-      const e = ENQUIRY[lang];
-      await send(chatId, e.greet(title), { reply_markup: { inline_keyboard: [[{ text: e.btn, url: `https://t.me/${OWNER_TG}` }]] } });
-      if (OWNER && String(chatId) !== String(OWNER)) {
-        const who = `${msg?.from?.first_name || ""} ${msg?.from?.username ? "@" + msg.from.username : ""}`.trim() || `id ${chatId}`;
-        await send(OWNER, `💬 Soʻrov: ${title}\n👤 ${who}\nMehmon shu kvartira boʻyicha bogʻlanmoqchi.`);
-      }
+      await sb.from("telegram_contact").upsert({ chat_id: String(chatId), apartment_id: aptId, title, booking_id: null, updated_at: new Date().toISOString() });
+      await send(chatId, ENQUIRY[lang](title));
       return NextResponse.json({ ok: true });
     }
 
@@ -172,10 +164,15 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true });
   }
 
-  // relay any other guest message to the owner
+  // relay any other guest message to the owner, TAGGED with the apartment/booking it came from
   if (OWNER && String(chatId) !== String(OWNER) && text) {
-    const who = `${msg?.from?.first_name || ""} ${msg?.from?.username ? "@" + msg.from.username : ""}`.trim();
-    await send(OWNER, `💬 Mehmon ${who} (id ${chatId}):\n${text}`);
+    const sb = createAdminClient();
+    const { data: ctx } = await sb.from("telegram_contact").select("title, booking_id").eq("chat_id", String(chatId)).maybeSingle();
+    const who = `${msg?.from?.first_name || ""} ${msg?.from?.username ? "@" + msg.from.username : ""}`.trim() || `id ${chatId}`;
+    const head = ctx?.title
+      ? `💬 ${ctx.title}${ctx.booking_id ? ` · 🔖 ${ctx.booking_id}` : ""}\n👤 ${who}`
+      : `💬 ${who} (id ${chatId})`;
+    await send(OWNER, `${head}:\n${text}`);
     await send(chatId, "Xabaringiz qabul qilindi — tez orada javob beramiz.");
   }
   return NextResponse.json({ ok: true });
