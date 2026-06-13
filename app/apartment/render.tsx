@@ -60,7 +60,9 @@ export function ApartmentView({ apt, locale }: { apt: any; locale: Locale }) {
   const districts = M.DISTRICTS as unknown as Record<string, Record<Locale, string>>;
   const district = districts[apt.district]?.[locale] || apt.district;
   const photos: string[] = apt.photoUrls || [];
-  const home = locale === "uz" ? "/" : `/${locale}`;
+  // The catalog SPA only exists at the root; /ru and /en are not routes (they 404).
+  // It restores the chosen language from localStorage, so "/" is correct for every locale.
+  const home = "/";
 
   const ld = {
     "@context": "https://schema.org",
@@ -90,7 +92,7 @@ export function ApartmentView({ apt, locale }: { apt: any; locale: Locale }) {
         </div>
       </header>
 
-      <div className="max-w-6xl mx-auto px-4 md:px-8 py-6">
+      <div className="max-w-6xl mx-auto px-4 md:px-8 pt-6 pb-28 lg:pb-6">
         {photos.length > 0 ? (
           <Gallery photos={photos} name={name} />
         ) : (
