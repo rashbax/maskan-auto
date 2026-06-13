@@ -84,6 +84,7 @@ export interface Beds24Booking {
 
 export interface Beds24BookingWrite {
   roomId: number;
+  propertyId?: number;
   status: string; // "confirmed" to block the dates
   arrival: string;
   departure: string;

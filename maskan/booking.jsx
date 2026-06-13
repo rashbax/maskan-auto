@@ -145,6 +145,8 @@ export function Booking({ apt, range, lang, STR, device, onBack, onHome, onBooke
       onBooked && onBooked(); // refresh availability so the dates show as busy
       // notify the owner (server-side; graceful no-op if the bot isn't configured yet)
       fetch("/api/notify-booking", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) }).catch(() => {});
+      // mirror to Beds24 so the dates close on connected OTAs (no-op until Beds24 is configured)
+      fetch("/api/beds24/push-booking", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) }).catch(() => {});
     } catch (e) {
       console.error("createBooking failed:", e);
       // optimistic: still confirm to the guest; the dates were held and the host follows up
