@@ -31,8 +31,8 @@ export function AptCard({ apt, lang, STR, filters, onOpen, device, saved, onTogg
           className="absolute top-3 right-3 w-9 h-9 grid place-items-center rounded-full bg-white/90 backdrop-blur hover:scale-110 transition-transform">
           <Icon name="heart" size={18} fill={fav ? "#1B5E40" : "none"} className={fav ? "text-green-600" : "text-ink"} sw={1.8} /></button>
         <div className="absolute bottom-3 left-3">
-          <span className="inline-flex items-baseline gap-1 px-3 h-9 rounded-full bg-white/94 backdrop-blur font-bold text-ink shadow-sm">
-            <span className="text-[16px] tnum">${apt.price}</span><span className="text-[12px] font-semibold text-inksoft">/{STR[lang].night1}</span>
+          <span className="inline-flex items-baseline gap-1 px-3.5 py-2 rounded-full bg-white/95 backdrop-blur font-bold text-ink shadow-sm">
+            <span className="text-[15px] tnum">${apt.price}</span><span className="text-[12px] font-semibold text-inksoft">/{STR[lang].night1}</span>
           </span>
         </div>
       </div>
