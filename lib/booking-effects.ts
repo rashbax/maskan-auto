@@ -50,6 +50,7 @@ export async function notifyOwner(id: string) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ chat_id: CHAT, text, disable_web_page_preview: true }),
+      signal: AbortSignal.timeout(8000),
     });
     const j = await res.json();
     if (!j.ok) await sb.from("bookings").update({ notified_at: null }).eq("id", id); // release for retry

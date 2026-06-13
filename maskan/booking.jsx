@@ -140,7 +140,6 @@ export function Booking({ apt, range, lang, STR, device, onBack, onHome, onBooke
         children: form.children,
         from: range.from,
         to: range.to,
-        price: apt.price,
       });
     } catch (e) {
       // The dates were NOT held (overlap / RLS / network) — never show a fake confirmation.

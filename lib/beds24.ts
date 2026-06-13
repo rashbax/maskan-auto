@@ -20,7 +20,7 @@ let cached: { token: string; exp: number } | null = null;
 async function accessToken(): Promise<string> {
   if (!REFRESH) throw new Error("beds24_not_configured");
   if (cached && cached.exp > Date.now() + 60_000) return cached.token;
-  const res = await fetch(`${BASE}/authentication/token`, { headers: { refreshToken: REFRESH } });
+  const res = await fetch(`${BASE}/authentication/token`, { headers: { refreshToken: REFRESH }, signal: AbortSignal.timeout(8000) });
   if (!res.ok) throw new Error(`beds24_token_failed_${res.status}`);
   const j = (await res.json()) as { token: string; expiresIn?: number };
   cached = { token: j.token, exp: Date.now() + (j.expiresIn ?? 86400) * 1000 };
@@ -32,6 +32,7 @@ async function b24<T>(path: string, init: RequestInit = {}): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     ...init,
     headers: { token, "Content-Type": "application/json", ...(init.headers || {}) },
+    signal: init.signal ?? AbortSignal.timeout(8000),
   });
   const j = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(`beds24_${res.status}: ${JSON.stringify(j).slice(0, 300)}`);

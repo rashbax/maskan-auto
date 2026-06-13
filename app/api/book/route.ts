@@ -1,11 +1,22 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { notifyOwner, pushToBeds24 } from "@/lib/booking-effects";
 
 export const runtime = "nodejs";
 
-const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const DAY = 86400000;
+const MAX_NIGHTS = 90;
+const HORIZON_DAYS = 365;
+
+// Strict YYYY-MM-DD: rejects impossible calendar dates (e.g. 2026-02-31) that a regex + Date.parse
+// would silently normalize into a different day (and then 500 at the DB).
+function validDate(s: string): boolean {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+  if (!m) return false;
+  const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  const dt = new Date(Date.UTC(y, mo - 1, d));
+  return dt.getUTCFullYear() === y && dt.getUTCMonth() === mo - 1 && dt.getUTCDate() === d;
+}
 
 // Trusted booking creation. The client sends only the request (dates, guest, party size); the
 // server derives the price/nights from the DB, checks availability, and inserts with the service
@@ -25,15 +36,17 @@ export async function POST(req: Request) {
   const phone = String(body.phone || "").trim();
   const telegram = body.telegram ? String(body.telegram) : null;
   const messenger = body.messenger === "whatsapp" ? "whatsapp" : "telegram";
-  const adults = Number(body.adults);
-  const children = Number(body.children);
+  const adults = Math.trunc(Number(body.adults));
+  const children = Math.trunc(Number(body.children));
 
   // --- validate (never trust the client for price/nights/availability) ---
-  if (!apartmentId || !DATE.test(from) || !DATE.test(to)) return NextResponse.json({ error: "bad_input" }, { status: 400 });
+  if (!apartmentId || !validDate(from) || !validDate(to)) return NextResponse.json({ error: "bad_input" }, { status: 400 });
   const nights = Math.round((Date.parse(to) - Date.parse(from)) / DAY);
-  if (!(nights >= 1)) return NextResponse.json({ error: "bad_dates" }, { status: 400 });
+  if (nights < 1 || nights > MAX_NIGHTS) return NextResponse.json({ error: "bad_dates" }, { status: 400 });
   const todayTashkent = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tashkent" }).format(new Date());
+  const horizon = new Date(Date.now() + HORIZON_DAYS * DAY).toISOString().slice(0, 10);
   if (from < todayTashkent) return NextResponse.json({ error: "past_date" }, { status: 400 });
+  if (from > horizon) return NextResponse.json({ error: "too_far" }, { status: 400 });
   if (!guestName) return NextResponse.json({ error: "name_required" }, { status: 400 });
   const digits = phone.replace(/\D/g, "");
   if (digits.length < 9 || digits.length > 15) return NextResponse.json({ error: "bad_phone" }, { status: 400 });
@@ -85,14 +98,16 @@ export async function POST(req: Request) {
     status: "active",
   });
   if (error) {
-    // 23P01 = exclusion_violation — the dates were taken between the check and the insert
-    if (error.code === "23P01") return NextResponse.json({ error: "unavailable" }, { status: 409 });
+    // overlap (23P01 exclusion) or owner-blocked dates (23514 from the block trigger) — the dates
+    // were taken between the check and the insert.
+    if (error.code === "23P01" || error.code === "23514") return NextResponse.json({ error: "unavailable" }, { status: 409 });
     console.error("book insert failed:", error);
     return NextResponse.json({ error: "insert_failed" }, { status: 500 });
   }
 
-  // trusted side effects — await so they finish in this invocation; a failure won't fail the booking
-  await Promise.allSettled([notifyOwner(id), pushToBeds24(id)]);
+  // The booking is committed. Run the owner notice + Beds24 push AFTER the response so a slow or
+  // hung external call never delays or fails the confirmation the client sees.
+  after(() => Promise.allSettled([notifyOwner(id), pushToBeds24(id)]));
 
   return NextResponse.json({ id });
 }
