@@ -418,9 +418,19 @@ function CalManager({ lang, STR, apartments, bookings }) {
   const today = dOnly(M.TODAY);
   async function toggle(d) {
     const k = M.iso(d);
-    const s = new Set(blocked);
-    if (s.has(k)) { s.delete(k); setBlocked(s); await unblockDay(aptId, k); }
-    else { s.add(k); setBlocked(s); await blockDay(aptId, k); }
+    const wasBlocked = blocked.has(k);
+    const next = new Set(blocked);
+    if (wasBlocked) next.delete(k); else next.add(k);
+    setBlocked(next); // optimistic
+    try {
+      if (wasBlocked) await unblockDay(aptId, k);
+      else await blockDay(aptId, k);
+    } catch (e) {
+      setBlocked(blocked); // rollback to the pre-toggle state
+      alert(e?.code === "23B01"
+        ? (lang === "ru" ? "Эта дата уже забронирована — заблокировать нельзя." : lang === "uz" ? "Bu sana band qilingan — bloklab boʻlmaydi." : "This date already has a booking — can't block it.")
+        : (lang === "ru" ? "Не удалось сохранить. Попробуйте ещё раз." : lang === "uz" ? "Saqlab boʻlmadi. Qayta urining." : "Could not save. Please try again."));
+    }
   }
   function shift(delta) { let m = view.m + delta, y = view.y; if (m < 0) { m = 11; y--; } if (m > 11) { m = 0; y++; } setView({ y, m }); }
   if (!apt) return null;

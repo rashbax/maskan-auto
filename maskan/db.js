@@ -243,11 +243,14 @@ export async function getBlocks(apartmentId) {
 }
 export async function blockDay(apartmentId, date) {
   const sb = createClient();
-  await sb.from("availability_blocks").insert({ apartment_id: apartmentId, date });
+  // throws (e.g. 23B01) when the day already has an active booking — caller rolls back the UI
+  const { error } = await sb.from("availability_blocks").insert({ apartment_id: apartmentId, date });
+  if (error) throw error;
 }
 export async function unblockDay(apartmentId, date) {
   const sb = createClient();
-  await sb.from("availability_blocks").delete().eq("apartment_id", apartmentId).eq("date", date);
+  const { error } = await sb.from("availability_blocks").delete().eq("apartment_id", apartmentId).eq("date", date);
+  if (error) throw error;
 }
 
 // ---------- admin: review moderation (admin sees hidden too via RLS) ----------
