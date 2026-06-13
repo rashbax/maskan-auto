@@ -111,35 +111,33 @@ export async function setPhotoOrder(items) {
   );
 }
 
-// Create an instant booking. Access codes are NOT auto-sent — the host contacts
-// the guest (via the contact left here) to hand over keys at check-in.
-export async function createBooking({ apartmentId, guestName, phone, telegram, messenger, adults, children, from, to, price }) {
+// Create an instant booking via the trusted server route. The server derives price/nights and
+// checks availability (direct client inserts are blocked by RLS). Access codes are NOT auto-sent
+// — the host contacts the guest (via the contact left here) to hand over keys at check-in.
+export async function createBooking({ apartmentId, guestName, phone, telegram, messenger, adults, children, from, to }) {
   const sb = createClient();
-  const { data: { user } } = await sb.auth.getUser();
-  const checkin = MASKAN.iso(from);
-  const checkout = MASKAN.iso(to);
-  const nights = Math.round((to - from) / 86400000);
-  const id = "BK-" + Date.now().toString().slice(-7);
-
-  const { error } = await sb.from("bookings").insert({
-    id,
-    apartment_id: apartmentId,
-    user_id: user?.id ?? null, // link to the account if signed in
-    guest_name: guestName || null,
-    phone: phone || null,
-    telegram: telegram || null,
-    messenger: messenger || "telegram",
-    adults: adults ?? null,
-    children: children ?? 0,
-    checkin,
-    checkout,
-    nights,
-    total_usd: price ? price * nights : null,
-    source: "website",
-    status: "active",
+  const { data: { session } } = await sb.auth.getSession(); // link to the account if signed in
+  const res = await fetch("/api/book", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+    },
+    body: JSON.stringify({
+      apartmentId,
+      from: MASKAN.iso(from),
+      to: MASKAN.iso(to),
+      guestName,
+      phone,
+      telegram,
+      messenger,
+      adults,
+      children,
+    }),
   });
-  if (error) throw error;
-  return id;
+  const j = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(j.error || "booking_failed");
+  return j.id;
 }
 
 // ---------- favorites (signed-in users; RLS = own rows) ----------
