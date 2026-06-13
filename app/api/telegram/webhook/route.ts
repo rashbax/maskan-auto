@@ -6,6 +6,7 @@ export const runtime = "nodejs";
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const SECRET = process.env.TELEGRAM_WEBHOOK_SECRET;
 const OWNER = process.env.TELEGRAM_OWNER_CHAT_ID;
+const OWNER_TG = process.env.TELEGRAM_OWNER_CONTACT || "+998940026056"; // host's personal Telegram (by phone)
 
 async function send(chatId: number | string, text: string, extra: Record<string, unknown> = {}) {
   await fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
@@ -36,6 +37,15 @@ const CONSENT = {
 } as const;
 
 const pick = (lang?: string) => CONSENT[(lang as keyof typeof CONSENT)] || CONSENT.uz;
+
+// Apartment enquiry: the guest tapped "Telegram" on an apartment, so we greet them by the
+// apartment name and hand off to the host's personal chat (the bot can't relay context into
+// that chat, so it also pings the host with who + which apartment).
+const ENQUIRY = {
+  uz: { greet: (t: string) => `🏡 ${t}\n\nShu kvartira boʻyicha soʻrovingiz qabul qilindi. Egamizga toʻgʻridan-toʻgʻri yozish uchun pastdagi tugmani bosing 👇`, btn: "✍️ Egaga yozish" },
+  ru: { greet: (t: string) => `🏡 ${t}\n\nВаш запрос по этой квартире принят. Чтобы написать хозяину напрямую, нажмите кнопку ниже 👇`, btn: "✍️ Написать хозяину" },
+  en: { greet: (t: string) => `🏡 ${t}\n\nWe received your enquiry about this apartment. Tap below to message the host directly 👇`, btn: "✍️ Message the host" },
+} as const;
 
 // Telegram bot webhook. Confirms a website login ONLY after the user taps an explicit consent
 // button (so an attacker can't have a victim's /start stamp a nonce the attacker initiated).
@@ -89,9 +99,30 @@ export async function POST(req: Request) {
   const text = msg?.text || "";
   if (!chatId) return NextResponse.json({ ok: true });
 
-  // --- /start <nonce>: do NOT auto-confirm — ask for explicit consent with context ---
+  // --- /start <payload> ---
   if (text.startsWith("/start ")) {
-    const nonce = text.split(/\s+/)[1];
+    const payload = text.split(/\s+/)[1] || "";
+
+    // (A) apartment enquiry deep-link: start=<aptId>_<lang> → greet the guest + hand off to host
+    if (payload.startsWith("apt-")) {
+      const us = payload.indexOf("_");
+      const aptId = us === -1 ? payload : payload.slice(0, us);
+      const lng = us === -1 ? "uz" : payload.slice(us + 1);
+      const lang = (["uz", "ru", "en"].includes(lng) ? lng : "uz") as keyof typeof ENQUIRY;
+      const sb = createAdminClient();
+      const { data: apt } = await sb.from("apartments").select("title").eq("id", aptId).single();
+      const title = (apt?.title as Record<string, string> | null)?.[lang] || (apt?.title as Record<string, string> | null)?.uz || aptId;
+      const e = ENQUIRY[lang];
+      await send(chatId, e.greet(title), { reply_markup: { inline_keyboard: [[{ text: e.btn, url: `https://t.me/${OWNER_TG}` }]] } });
+      if (OWNER && String(chatId) !== String(OWNER)) {
+        const who = `${msg?.from?.first_name || ""} ${msg?.from?.username ? "@" + msg.from.username : ""}`.trim() || `id ${chatId}`;
+        await send(OWNER, `💬 Soʻrov: ${title}\n👤 ${who}\nMehmon shu kvartira boʻyicha bogʻlanmoqchi.`);
+      }
+      return NextResponse.json({ ok: true });
+    }
+
+    // (B) login nonce → do NOT auto-confirm; ask for explicit consent with context
+    const nonce = payload;
     if (nonce && msg?.from?.id) {
       const sb = createAdminClient();
       const { data: row } = await sb.from("telegram_login").select("status, lang").eq("nonce", nonce).single();

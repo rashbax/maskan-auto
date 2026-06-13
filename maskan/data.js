@@ -349,7 +349,8 @@ const STR = {
 
 export const MASKAN = {
   TODAY, iso, addDays, APARTMENTS, BOOKINGS, GUEST_BOOKINGS, AMENITIES, DISTRICTS, TONES, STR,
-  // Customer-facing contact. `tg` is a personal Telegram (by phone) — NOT the login/notify bot,
-  // which lives in env (BOT / TELEGRAM_OWNER_CHAT_ID) and is unaffected by this.
-  CONTACT: { wa: "998901234567", tg: "+998940026056" },
+  // Customer-facing contact. Telegram goes through the bot so it can identify the apartment
+  // (start=<aptId>_<lang>), greet the guest, and hand off to the host's personal chat
+  // (TELEGRAM_OWNER_CONTACT, used server-side in the webhook). WhatsApp is a direct number.
+  CONTACT: { wa: "998901234567", bot: "maskan_tashkentbot" },
 };

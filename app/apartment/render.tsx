@@ -23,6 +23,11 @@ const T = {
     ru: "Здание показано на карте. Номер квартиры (этаж / подъезд) отправим после бронирования.",
     en: "The building is shown on the map. The apartment number (floor / entrance) is sent after you book.",
   },
+  waText: {
+    uz: "Salom! Ushbu kvartira boʻyicha soʻramoqchiman:",
+    ru: "Здравствуйте! Хочу узнать об этой квартире:",
+    en: "Hello! I'd like to ask about this apartment:",
+  },
   descFallback: (price: number, sleeps: number) => ({
     uz: `Toshkentda kunlik kvartira — $${price}/kecha, ${sleeps} kishigacha. Lahzada band qiling.`,
     ru: `Посуточная квартира в Ташкенте — $${price}/ночь, до ${sleeps} гостей. Мгновенное бронирование.`,
@@ -183,8 +188,8 @@ export function ApartmentView({ apt, locale }: { apt: any; locale: Locale }) {
               <h2 className="font-serif text-[20px] mb-1">{S.questions_title}</h2>
               <p className="text-[13.5px] text-inksoft mb-4">{S.questions_sub}</p>
               <div className="flex flex-col sm:flex-row gap-3">
-                <a href={`https://wa.me/${M.CONTACT.wa}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center gap-2 h-12 px-5 rounded-full bg-white border border-line font-semibold text-[14.5px] hover:border-ink/30">WhatsApp</a>
-                <a href={`https://t.me/${M.CONTACT.tg}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center gap-2 h-12 px-5 rounded-full bg-green-700 text-cream font-semibold text-[14.5px] hover:bg-green-900">Telegram</a>
+                <a href={`https://wa.me/${M.CONTACT.wa}?text=${encodeURIComponent(`${T.waText[locale]} ${name} — ${aptUrl(apt.id, locale)}`)}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center gap-2 h-12 px-5 rounded-full bg-white border border-line font-semibold text-[14.5px] hover:border-ink/30">WhatsApp</a>
+                <a href={`https://t.me/${M.CONTACT.bot}?start=${apt.id}_${locale}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center gap-2 h-12 px-5 rounded-full bg-green-700 text-cream font-semibold text-[14.5px] hover:bg-green-900">Telegram</a>
               </div>
             </section>
           </div>

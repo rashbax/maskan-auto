@@ -93,11 +93,11 @@ function Confirmation({ apt, range, form, lang, STR, onHome, bookingId }) {
       </div>
 
       <div className="mt-7 space-y-3">
-        <ChannelBtn channel={form.messenger} lang={lang} STR={STR} variant="solid" full text={`${STR[lang].booking_no} ${bookingId} · ${apt.title[lang]}`}>
+        <ChannelBtn channel={form.messenger} lang={lang} STR={STR} variant="solid" full aptId={apt.id} text={`${STR[lang].booking_no} ${bookingId} · ${apt.title[lang]}`}>
           {form.messenger === "whatsapp" ? STR[lang].get_whatsapp : STR[lang].get_telegram}
         </ChannelBtn>
         <div className="grid grid-cols-2 gap-3">
-          <ChannelBtn channel={form.messenger === "whatsapp" ? "telegram" : "whatsapp"} lang={lang} STR={STR} variant="outline" />
+          <ChannelBtn channel={form.messenger === "whatsapp" ? "telegram" : "whatsapp"} lang={lang} STR={STR} variant="outline" aptId={apt.id} />
           <Button onClick={onHome}>{STR[lang].done}</Button>
         </div>
       </div>
