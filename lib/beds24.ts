@@ -52,6 +52,11 @@ export function validateToken() {
   return b24<{ validToken: boolean }>("/authentication/details");
 }
 
+// List properties + their rooms — handy for reading off propertyId / roomId after connecting.
+export function getProperties() {
+  return b24<unknown>("/properties?includeAllRooms=true");
+}
+
 // INBOUND: bookings changed since a timestamp, for the periodic pull. Params are passed through
 // to Beds24 (e.g. { propertyId, roomId, modifiedFrom, arrivalFrom, departureTo }).
 export function getBookings(params: Record<string, string>) {

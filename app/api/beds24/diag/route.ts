@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { beds24Enabled, validateToken, setupFromInviteCode } from "@/lib/beds24";
+import { beds24Enabled, validateToken, setupFromInviteCode, getProperties } from "@/lib/beds24";
 
 export const runtime = "nodejs";
 
@@ -19,6 +19,16 @@ export async function GET(req: Request) {
       const t = await setupFromInviteCode(setup);
       // Shown once so it can be copied into BEDS24_REFRESH_TOKEN — never logged elsewhere.
       return NextResponse.json({ refreshToken: t.refreshToken, expiresIn: t.expiresIn });
+    } catch (e) {
+      return NextResponse.json({ error: String(e) }, { status: 502 });
+    }
+  }
+
+  // ?props=1 → list properties + rooms so you can read off propertyId / roomId
+  if (url.searchParams.get("props")) {
+    if (!beds24Enabled()) return NextResponse.json({ enabled: false });
+    try {
+      return NextResponse.json(await getProperties());
     } catch (e) {
       return NextResponse.json({ error: String(e) }, { status: 502 });
     }
