@@ -37,12 +37,15 @@ export async function GET(req: NextRequest) {
   const { data: claimed } = await sb.from("telegram_login").delete().eq("nonce", nonce).eq("status", "confirmed").select().maybeSingle();
   if (!claimed) return NextResponse.json({ status: "pending" }, { headers: NO_STORE });
 
-  // Pin the magic-link origin to a trusted, fixed site URL so a forged x-forwarded-host can't
-  // redirect the one-time link to an attacker domain. Fall back to the request host only in
-  // local dev (where SITE_URL isn't set).
+  // Pin the magic-link origin to a trusted host so a forged x-forwarded-host can't redirect the
+  // one-time link to an attacker domain. SITE_URL wins; in production fall back to the canonical
+  // URL (never the request headers); only dev uses the request host (localhost).
   const host = req.headers.get("x-forwarded-host") || req.headers.get("host") || req.nextUrl.host;
   const proto = req.headers.get("x-forwarded-proto") || (host.includes("localhost") ? "http" : "https");
-  const origin = process.env.SITE_URL || `${proto}://${host}`;
+  const origin = (
+    process.env.SITE_URL ||
+    (process.env.NODE_ENV === "production" ? "https://maskan-auto.vercel.app" : `${proto}://${host}`)
+  ).replace(/\/$/, "");
 
   const link = await mintTelegramSession(
     { id: claimed.telegram_id, first_name: claimed.first_name, last_name: claimed.last_name, username: claimed.username, photo_url: claimed.photo_url },

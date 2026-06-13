@@ -1,7 +1,14 @@
 // ============ Maskan — mock data + i18n (UZ / RU / EN) ============
 
-// real "today" at local midnight — drives the calendar min date + past-date blocking
-const TODAY = (() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; })();
+// "Today" in Tashkent (the business timezone, UTC+5, no DST). Computing the date there means
+// the server (UTC) and the client (visitor-local) agree on the same Y/M/D — no midnight drift
+// or hydration mismatch. Drives the calendar min date + past-date blocking.
+const TODAY = (() => {
+  const [y, m, d] = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Tashkent", year: "numeric", month: "2-digit", day: "2-digit",
+  }).format(new Date()).split("-").map(Number);
+  return new Date(y, m - 1, d);
+})();
 
 const iso = (d) => {
   const y = d.getFullYear();

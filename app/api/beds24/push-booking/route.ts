@@ -22,6 +22,9 @@ export async function POST(req: Request) {
   const { data: b } = await sb.from("bookings").select("*").eq("id", id).single();
   if (!b) return NextResponse.json({ error: "not_found" }, { status: 404 });
   if (b.beds24_booking_id) return NextResponse.json({ skipped: "already_synced" });
+  // Only mirror our own active website bookings — never echo a row that came FROM Beds24/OTA
+  // (would loop), and ignore cancelled/non-active rows.
+  if (b.source !== "website" || b.status !== "active") return NextResponse.json({ skipped: "not_a_website_booking" });
 
   const { data: apt } = await sb
     .from("apartments")
