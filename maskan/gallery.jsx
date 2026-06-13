@@ -18,8 +18,13 @@ export function Gallery({ photos, name }) {
   const n = photos.length;
   const isOpen = openAt !== null;
 
-  const open = (i) => { setActive(i); activeRef.current = i; setOpenAt(i); };
-  const close = () => setOpenAt(null);
+  // Opening pushes a history entry so the phone's Back button closes the lightbox
+  // (instead of leaving the apartment page). Both Back and the ✕ go through history.back().
+  const open = (i) => {
+    setActive(i); activeRef.current = i; setOpenAt(i);
+    window.history.pushState({ maskanLightbox: true }, "");
+  };
+  const requestClose = () => window.history.back();
 
   // Active index is read straight off scrollLeft — no separate source of truth, no rAF.
   const onScroll = () => {
@@ -44,12 +49,21 @@ export function Gallery({ photos, name }) {
     if (el) el.scrollLeft = openAt * el.clientWidth;
   }, [isOpen, openAt]);
 
+  // Back button (popstate) closes the lightbox — the entry pushed in open() is already
+  // popped by the browser here, so we just clear state (no extra history.back()).
+  useEffect(() => {
+    if (!isOpen) return;
+    const onPop = () => setOpenAt(null);
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, [isOpen]);
+
   // Body scroll lock + keyboard while open.
   useEffect(() => {
     if (!isOpen) return;
     document.body.style.overflow = "hidden";
     const onKey = (e) => {
-      if (e.key === "Escape") close();
+      if (e.key === "Escape") requestClose();
       else if (e.key === "ArrowLeft") goTo(activeRef.current - 1);
       else if (e.key === "ArrowRight") goTo(activeRef.current + 1);
     };
@@ -101,7 +115,7 @@ export function Gallery({ photos, name }) {
         <div className="gallery-lightbox fixed inset-0 z-[60] bg-black/95 flex flex-col">
           {/* top bar: close (left) + counter (right) */}
           <div className="relative z-10 flex items-center justify-between px-3 pt-3 pb-2">
-            <button onClick={close} aria-label="close" className="w-11 h-11 grid place-items-center rounded-full bg-white/15 hover:bg-white/25 text-white text-[20px]">✕</button>
+            <button onClick={requestClose} aria-label="close" className="w-11 h-11 grid place-items-center rounded-full bg-white/15 hover:bg-white/25 text-white text-[20px]">✕</button>
             <span className="px-3 text-white/80 text-[13px] tnum">{active + 1} / {n}</span>
           </div>
 
