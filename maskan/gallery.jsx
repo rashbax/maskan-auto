@@ -128,7 +128,7 @@ export function Gallery({ photos, name }) {
             {photos.map((u, k) => {
               const near = Math.abs(k - active) <= 1; // only eager-load neighbours; placeholder the rest
               return (
-                <div key={k} className="relative shrink-0 w-full h-full snap-center flex items-center justify-center px-2">
+                <div key={k} className="relative shrink-0 w-full h-full snap-center snap-always flex items-center justify-center px-2">
                   {near ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
