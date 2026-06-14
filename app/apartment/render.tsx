@@ -5,6 +5,7 @@ import { MapView } from "@/maskan/maps";
 import { AptReserve } from "@/maskan/apt-reserve";
 import { Gallery } from "@/maskan/gallery";
 import { SaveButton, ReviewWidget } from "@/maskan/apt-actions";
+import { Description } from "@/maskan/description";
 
 export type Locale = "uz" | "ru" | "en";
 export const LOCALES: Locale[] = ["uz", "ru", "en"];
@@ -129,7 +130,7 @@ export function ApartmentView({ apt, locale }: { apt: any; locale: Locale }) {
 
             {pickL(apt.blurb, locale) && (
               <section className="mt-6 pt-6 border-t border-line">
-                <p className="text-[15px] leading-relaxed text-ink/85 whitespace-pre-line">{pickL(apt.blurb, locale)}</p>
+                <Description text={pickL(apt.blurb, locale)} lang={locale} />
               </section>
             )}
 
