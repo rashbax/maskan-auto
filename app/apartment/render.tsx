@@ -10,7 +10,9 @@ export type Locale = "uz" | "ru" | "en";
 export const LOCALES: Locale[] = ["uz", "ru", "en"];
 const BASE = "https://maskan-auto.vercel.app";
 
-const pickL = (o: Record<string, string> | undefined, l: Locale) => (o?.[l] || o?.uz || o?.ru || o?.en || "").trim();
+// normalise CRLF/CR → LF so whitespace-pre-line renders the same across browsers (Yandex/Chromium
+// can otherwise show a stray carriage return as a broken line break / extra space).
+const pickL = (o: Record<string, string> | undefined, l: Locale) => (o?.[l] || o?.uz || o?.ru || o?.en || "").replace(/\r\n?/g, "\n").trim();
 
 const T = {
   catalog: { uz: "Katalog", ru: "Каталог", en: "Catalog" },

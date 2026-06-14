@@ -136,8 +136,7 @@ export function Gallery({ photos, name }) {
                       alt={`${name} — ${k + 1}`}
                       loading="eager"
                       draggable={false}
-                      onLoad={(e) => { e.currentTarget.style.opacity = "1"; }}
-                      className="max-w-full max-h-full object-contain select-none opacity-0 transition-opacity duration-300"
+                      className="max-w-full max-h-full object-contain select-none"
                     />
                   ) : (
                     <div className="w-[78vw] h-[58vh] max-w-full max-h-full rounded-2xl bg-gradient-to-br from-white/10 to-transparent animate-pulse" aria-hidden />
