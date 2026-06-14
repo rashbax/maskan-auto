@@ -241,6 +241,8 @@ function EditApt({ lang, STR, id, onBack, apartments, onSaved }) {
   const [address, setAddress] = useState("");
   const [lat, setLat] = useState(apt?.lat ?? null);
   const [lng, setLng] = useState(apt?.lng ?? null);
+  const [checkIn, setCheckIn] = useState(apt?.checkInTime || "14:00");
+  const [checkOut, setCheckOut] = useState(apt?.checkOutTime || "12:00");
   const allAmen = Object.keys(M.AMENITIES);
   const fld = "mt-1.5 w-full h-12 px-4 rounded-xl bg-white border border-line outline-none focus:border-green-600 focus:ring-2 focus:ring-green-600/15 transition text-[15px]";
   const langTabs = (
@@ -251,7 +253,7 @@ function EditApt({ lang, STR, id, onBack, apartments, onSaved }) {
     </div>
   );
   function buildRow() {
-    return { id: aptId, tone, price_usd: Number(price) || 0, district, sleeps: Number(guests) || 1, beds: Number(beds) || 0, living_rooms: Number(livingRooms) || 0, baths: Number(baths) || 1, size_m2: Number(size) || 0, lat, lng, host: apt?.host || "Maskan", title: titleI18n, blurb: blurbI18n, near: nearI18n, amenities: amen, photos_count: photos.length || count, status: "active" };
+    return { id: aptId, tone, price_usd: Number(price) || 0, district, sleeps: Number(guests) || 1, beds: Number(beds) || 0, living_rooms: Number(livingRooms) || 0, baths: Number(baths) || 1, size_m2: Number(size) || 0, lat, lng, check_in_time: checkIn || "14:00", check_out_time: checkOut || "12:00", host: apt?.host || "Maskan", title: titleI18n, blurb: blurbI18n, near: nearI18n, amenities: amen, photos_count: photos.length || count, status: "active" };
   }
   async function persistApartment() { await saveApartment(buildRow(), address); }
   async function save() {
@@ -351,6 +353,17 @@ function EditApt({ lang, STR, id, onBack, apartments, onSaved }) {
           <NumF label={STR[lang].a_living} value={livingRooms} set={setLivingRooms} min={0} />
           <NumF label={STR[lang].a_baths} value={baths} set={setBaths} min={1} />
           <NumF label={STR[lang].a_size} value={size} set={setSize} min={10} max={500} />
+        </div>
+      </div>
+
+      {/* house rules — check-in / check-out times (local property time) */}
+      <div className="rounded-2xl border border-line bg-white p-4 mb-5">
+        <div className="text-[14px] font-bold mb-3">{STR[lang].house_rules}</div>
+        <div className="grid grid-cols-2 gap-3">
+          <label className="block"><span className="text-[13px] font-bold">{STR[lang].checkin}</span>
+            <input type="time" value={checkIn} onChange={(e) => setCheckIn(e.target.value)} className={fld + " tnum"} /></label>
+          <label className="block"><span className="text-[13px] font-bold">{STR[lang].checkout}</span>
+            <input type="time" value={checkOut} onChange={(e) => setCheckOut(e.target.value)} className={fld + " tnum"} /></label>
         </div>
       </div>
 

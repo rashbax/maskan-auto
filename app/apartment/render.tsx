@@ -150,8 +150,8 @@ export function ApartmentView({ apt, locale }: { apt: any; locale: Locale }) {
             <section className="mt-6 pt-6 border-t border-line">
               <h2 className="font-serif text-[20px] mb-3">{S.house_rules}</h2>
               <div className="grid grid-cols-2 gap-4 text-[14px]">
-                <div><b>{S.checkin}</b> · 14:00</div>
-                <div><b>{S.checkout}</b> · 12:00</div>
+                <div><b>{S.checkin}</b> · {apt.checkInTime}</div>
+                <div><b>{S.checkout}</b> · {apt.checkOutTime}</div>
               </div>
             </section>
 

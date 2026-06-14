@@ -219,8 +219,8 @@ export function Detail({ apt, lang, STR, device, range, setRange, onBack, onBook
 
           <Section title={STR[lang].house_rules}>
             <div className="grid grid-cols-2 gap-4 text-[14px]">
-              <div className="flex items-center gap-2.5"><Icon name="selfcheckin" size={20} className="text-green-700" /><span><b>{STR[lang].checkin}</b> · 14:00</span></div>
-              <div className="flex items-center gap-2.5"><Icon name="logout" size={20} className="text-green-700" /><span><b>{STR[lang].checkout}</b> · 12:00</span></div>
+              <div className="flex items-center gap-2.5"><Icon name="selfcheckin" size={20} className="text-green-700" /><span><b>{STR[lang].checkin}</b> · {apt.checkInTime || "14:00"}</span></div>
+              <div className="flex items-center gap-2.5"><Icon name="logout" size={20} className="text-green-700" /><span><b>{STR[lang].checkout}</b> · {apt.checkOutTime || "12:00"}</span></div>
             </div>
           </Section>
 
