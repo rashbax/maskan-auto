@@ -112,60 +112,54 @@ export function Gallery({ photos, name }) {
       </div>
 
       {isOpen && (
-        <div className="gallery-lightbox fixed inset-0 z-[60] bg-black/95 flex flex-col">
-          {/* top bar: close (left) + counter (right) */}
-          <div className="relative z-10 flex items-center justify-between px-3 pt-3 pb-2">
-            <button onClick={requestClose} aria-label="close" className="w-11 h-11 grid place-items-center rounded-full bg-white/15 hover:bg-white/25 text-white text-[20px]">✕</button>
-            <span className="px-3 text-white/80 text-[13px] tnum">{active + 1} / {n}</span>
-          </div>
-
-          {/* swipe track: each photo is a full-width snap slide; active index comes from scrollLeft */}
+        <div className="gallery-lightbox fixed inset-0 z-[60] bg-black/95">
+          {/* swipe track FILLS the overlay (absolute inset-0 → definite height = viewport), so slide
+              sizing never depends on a flex height that some engines (Yandex) resolve to auto. */}
           <div
             ref={trackRef}
             onScroll={onScroll}
-            className="no-scrollbar flex-1 min-h-0 flex overflow-x-auto overflow-y-hidden snap-x snap-mandatory overscroll-x-contain"
+            className="no-scrollbar absolute inset-0 flex overflow-x-auto overflow-y-hidden snap-x snap-mandatory overscroll-contain touch-pan-x"
           >
-            {photos.map((u, k) => {
-              const near = Math.abs(k - active) <= 1; // only eager-load neighbours; placeholder the rest
-              return (
-                <div key={k} className="relative shrink-0 w-full h-full snap-center snap-always flex items-center justify-center px-2">
-                  {near ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={u}
-                      alt={`${name} — ${k + 1}`}
-                      loading="eager"
-                      draggable={false}
-                      className="max-w-full max-h-full object-contain select-none"
-                    />
-                  ) : (
-                    <div className="w-[78vw] h-[58vh] max-w-full max-h-full rounded-2xl bg-gradient-to-br from-white/10 to-transparent animate-pulse" aria-hidden />
-                  )}
-                </div>
-              );
-            })}
+            {photos.map((u, k) => (
+              <div key={k} className="shrink-0 w-screen h-full snap-center snap-always flex items-center justify-center p-2">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={u}
+                  alt={`${name} — ${k + 1}`}
+                  loading={Math.abs(k - active) <= 1 ? "eager" : "lazy"}
+                  draggable={false}
+                  className="max-h-[88vh] max-w-[94vw] object-contain select-none"
+                />
+              </div>
+            ))}
+          </div>
+
+          {/* top bar floats over the track (pointer-events-none so swipes pass through; buttons opt in) */}
+          <div className="absolute top-0 inset-x-0 z-10 flex items-center justify-between px-3 pt-3 pointer-events-none">
+            <button onClick={requestClose} aria-label="close" className="pointer-events-auto w-11 h-11 grid place-items-center rounded-full bg-black/40 hover:bg-black/60 text-white text-[20px]">✕</button>
+            <span className="px-3 py-1 rounded-full bg-black/40 text-white/90 text-[13px] tnum">{active + 1} / {n}</span>
           </div>
 
           {/* desktop-only arrows (no swipe with a mouse) */}
           {n > 1 && (
             <>
-              <button onClick={() => goTo(active - 1)} aria-label="previous photo" className="hidden md:grid absolute left-3 top-1/2 -translate-y-1/2 w-11 h-11 place-items-center rounded-full bg-white/15 hover:bg-white/25 text-white text-[22px]">‹</button>
-              <button onClick={() => goTo(active + 1)} aria-label="next photo" className="hidden md:grid absolute right-3 top-1/2 -translate-y-1/2 w-11 h-11 place-items-center rounded-full bg-white/15 hover:bg-white/25 text-white text-[22px]">›</button>
+              <button onClick={() => goTo(active - 1)} aria-label="previous photo" className="hidden md:grid absolute z-10 left-3 top-1/2 -translate-y-1/2 w-11 h-11 place-items-center rounded-full bg-black/40 hover:bg-black/60 text-white text-[22px]">‹</button>
+              <button onClick={() => goTo(active + 1)} aria-label="next photo" className="hidden md:grid absolute z-10 right-3 top-1/2 -translate-y-1/2 w-11 h-11 place-items-center rounded-full bg-black/40 hover:bg-black/60 text-white text-[22px]">›</button>
             </>
           )}
 
           {/* mobile-only windowed progress dots */}
           {n > 1 && (
-            <div className="md:hidden flex items-center justify-center gap-1.5 py-3" aria-hidden>
+            <div className="md:hidden absolute z-10 bottom-4 inset-x-0 flex items-center justify-center gap-1.5 pointer-events-none" aria-hidden>
               {dots.map((d) => (
-                <span key={d} className={`h-1.5 rounded-full transition-all ${d === active ? "w-4 bg-white" : "w-1.5 bg-white/40"}`} />
+                <span key={d} className={`h-1.5 rounded-full transition-all ${d === active ? "w-4 bg-white" : "w-1.5 bg-white/50"}`} />
               ))}
             </div>
           )}
 
           {/* desktop-only thumbnail strip */}
           {n > 1 && (
-            <div ref={thumbsRef} className="no-scrollbar hidden md:flex gap-2 overflow-x-auto px-4 py-3">
+            <div ref={thumbsRef} className="no-scrollbar hidden md:flex absolute z-10 bottom-0 inset-x-0 gap-2 overflow-x-auto px-4 py-3 bg-linear-to-t from-black/70 to-transparent">
               {photos.map((u, k) => (
                 <button key={k} type="button" onClick={() => goTo(k)} aria-label={`photo ${k + 1}`}
                   className={`shrink-0 w-16 h-12 rounded-lg overflow-hidden ring-2 transition ${k === active ? "ring-white" : "ring-transparent opacity-60 hover:opacity-100"}`}>
