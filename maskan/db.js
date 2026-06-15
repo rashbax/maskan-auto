@@ -55,6 +55,8 @@ export async function getApartments() {
     size: a.size_m2,
     checkInTime: a.check_in_time || "14:00",
     checkOutTime: a.check_out_time || "12:00",
+    beds24RoomId: a.beds24_room_id || "",
+    beds24PropId: a.beds24_prop_id || "",
     rating: Number(a.rating) || 0,
     reviews: a.reviews_count || 0,
     photos: a.photos_count || 0,

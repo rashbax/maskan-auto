@@ -254,6 +254,8 @@ function EditApt({ lang, STR, id, onBack, apartments, onSaved }) {
   const [lng, setLng] = useState(apt?.lng ?? null);
   const [checkIn, setCheckIn] = useState(apt?.checkInTime || "14:00");
   const [checkOut, setCheckOut] = useState(apt?.checkOutTime || "12:00");
+  const [beds24Room, setBeds24Room] = useState(apt?.beds24RoomId || "");
+  const [beds24Prop, setBeds24Prop] = useState(apt?.beds24PropId || "");
   const allAmen = Object.keys(M.AMENITIES);
   const fld = "mt-1.5 w-full h-12 px-4 rounded-xl bg-white border border-line outline-none focus:border-green-600 focus:ring-2 focus:ring-green-600/15 transition text-[15px]";
   const langTabs = (
@@ -264,7 +266,7 @@ function EditApt({ lang, STR, id, onBack, apartments, onSaved }) {
     </div>
   );
   function buildRow() {
-    return { id: aptId, tone, price_usd: Number(price) || 0, district, sleeps: Number(guests) || 1, beds: Number(beds) || 0, living_rooms: Number(livingRooms) || 0, baths: Number(baths) || 1, size_m2: Number(size) || 0, lat, lng, check_in_time: checkIn || "14:00", check_out_time: checkOut || "12:00", host: apt?.host || "Maskan", title: titleI18n, blurb: blurbI18n, near: nearI18n, amenities: amen, photos_count: photos.length || count, status: "active" };
+    return { id: aptId, tone, price_usd: Number(price) || 0, district, sleeps: Number(guests) || 1, beds: Number(beds) || 0, living_rooms: Number(livingRooms) || 0, baths: Number(baths) || 1, size_m2: Number(size) || 0, lat, lng, check_in_time: checkIn || "14:00", check_out_time: checkOut || "12:00", beds24_room_id: beds24Room.trim() || null, beds24_prop_id: beds24Prop.trim() || null, host: apt?.host || "Maskan", title: titleI18n, blurb: blurbI18n, near: nearI18n, amenities: amen, photos_count: photos.length || count, status: "active" };
   }
   async function persistApartment() { await saveApartment(buildRow(), address); }
   async function save() {
@@ -418,6 +420,19 @@ function EditApt({ lang, STR, id, onBack, apartments, onSaved }) {
           {allAmen.map((a) => <Chip key={a} active={amen.includes(a)} icon={AMENITY_ICON[a]} onClick={() => setAmen(amen.includes(a) ? amen.filter((x) => x !== a) : [...amen, a])}>{M.AMENITIES[a][lang]}</Chip>)}
         </div>
       </div>
+
+      {/* Beds24 channel mapping (optional; for two-way OTA sync) */}
+      <div className="rounded-2xl border border-line bg-white p-4 mb-7">
+        <div className="text-[14px] font-bold mb-0.5">Beds24</div>
+        <div className="text-[12px] text-inksoft mb-3">{lang === "ru" ? "ID для синхронизации с Beds24 (необязательно)" : lang === "uz" ? "Beds24 sinxroni uchun ID (ixtiyoriy)" : "IDs for Beds24 sync (optional)"}</div>
+        <div className="grid grid-cols-2 gap-3">
+          <label className="block"><span className="text-[13px] font-bold">Room ID</span>
+            <input inputMode="numeric" value={beds24Room} onChange={(e) => setBeds24Room(e.target.value.replace(/\D/g, ""))} placeholder="693405" className={fld + " tnum"} /></label>
+          <label className="block"><span className="text-[13px] font-bold">Property ID</span>
+            <input inputMode="numeric" value={beds24Prop} onChange={(e) => setBeds24Prop(e.target.value.replace(/\D/g, ""))} placeholder="334998" className={fld + " tnum"} /></label>
+        </div>
+      </div>
+
       <div className="flex gap-3 items-center"><Button onClick={save} disabled={saving} className={saving ? "opacity-60 pointer-events-none" : ""}>{STR[lang].a_save}</Button><Button variant="ghost" onClick={onBack}>{STR[lang].back}</Button>{apt && <button onClick={remove} className="ml-auto inline-flex items-center gap-1.5 text-[13.5px] font-semibold text-[#9a4a3c] hover:bg-red-50 h-10 px-3 rounded-full"><Icon name="trash" size={16} />{lang === "ru" ? "Удалить" : lang === "uz" ? "Oʻchirish" : "Delete"}</button>}</div>
     </div>
   );
