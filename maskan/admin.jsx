@@ -217,10 +217,15 @@ function Listings({ lang, STR, onEdit, apartments }) {
             <div className="p-3.5">
               <div className="font-serif text-[15px] leading-snug truncate">{a.title[lang]}</div>
               <div className="text-[12.5px] text-inksoft mt-1">{M.DISTRICTS[a.district][lang]} · {STR[lang].sleeps(a.sleeps)}</div>
-              {/* admin-only: apartment id (click to copy) — used for the Beds24 room mapping */}
-              <span onClick={(e) => { e.stopPropagation(); navigator.clipboard?.writeText(a.id); }}
-                title={lang === "ru" ? "Скопировать ID" : lang === "uz" ? "ID nusxa olish" : "Copy ID"}
-                className="inline-block mt-2 text-[11px] font-mono text-inksoft/80 bg-black/[.04] px-1.5 py-0.5 rounded cursor-copy hover:bg-black/[.08] select-all">{a.id}</span>
+              {/* admin-only: apartment id (left) + copy button (right) — for the Beds24 room mapping */}
+              <div className="flex items-center justify-between gap-2 mt-2">
+                <span className="text-[11px] font-mono text-inksoft/80 truncate"><span className="text-inksoft/55">ID:</span> <span className="select-all">{a.id}</span></span>
+                <span role="button" tabIndex={0} onClick={(e) => { e.stopPropagation(); navigator.clipboard?.writeText(a.id); }}
+                  title={lang === "ru" ? "Скопировать ID" : lang === "uz" ? "ID nusxa olish" : "Copy ID"}
+                  className="shrink-0 w-6 h-6 grid place-items-center rounded text-inksoft hover:text-ink hover:bg-black/[.06] cursor-pointer">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>
+                </span>
+              </div>
             </div>
           </button>
         ))}
