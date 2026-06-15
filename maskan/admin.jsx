@@ -52,12 +52,25 @@ function Dashboard({ lang, STR, bookings, apartments }) {
   const todays = list.filter((b) => b.from === today);
   const upcoming = list.filter((b) => b.from > today && b.status === "active");
   const revenue = list.filter((b) => b.status !== "cancelled").reduce((s, b) => s + (b.total || 0), 0);
+  // real occupancy: booked nights that fall in THIS month / (apartments × days in month)
+  const y = M.TODAY.getFullYear(), mo = M.TODAY.getMonth();
+  const daysInMonth = new Date(y, mo + 1, 0).getDate();
+  const mStart = new Date(y, mo, 1), mEnd = new Date(y, mo + 1, 1);
+  let bookedNights = 0;
+  for (const b of list) {
+    if (b.status === "cancelled") continue;
+    const s = Math.max(new Date(b.from).getTime(), mStart.getTime());
+    const e = Math.min(new Date(b.to).getTime(), mEnd.getTime());
+    if (e > s) bookedNights += Math.round((e - s) / 86400000);
+  }
+  const totalNights = (apartments || []).length * daysInMonth;
+  const occupancy = totalNights > 0 ? Math.round((bookedNights / totalNights) * 100) : 0;
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <StatCard label={STR[lang].a_today} value={todays.length} sub={STR[lang].search_city} accent />
         <StatCard label={STR[lang].a_upcoming} value={upcoming.length} />
-        <StatCard label={STR[lang].a_occupancy} value="78%" sub={calMonths[lang][M.TODAY.getMonth()]} />
+        <StatCard label={STR[lang].a_occupancy} value={occupancy + "%"} sub={calMonths[lang][M.TODAY.getMonth()]} />
         <StatCard label={STR[lang].a_revenue} value={"$" + revenue} sub={calMonths[lang][M.TODAY.getMonth()]} accent />
       </div>
       <div>
