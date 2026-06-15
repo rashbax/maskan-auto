@@ -5,7 +5,7 @@ import { Icon, Logo, Button, Chip, Badge, Photo, Stepper, AMENITY_ICON, GoogleG,
 import { calMonths, calWD, buildMonth, dOnly } from "./calendar";
 import { fmtRange } from "./catalog";
 import { StarRow } from "./reviews";
-import { getApartments, getAllBookings, cancelBooking, createManualBooking, getBlocks, blockDay, unblockDay, getAllReviews, setReviewHidden, setReviewReply, saveApartment, deleteApartment, requestUploadUrl, addPhoto, getPhotos, deletePhoto, setPhotoOrder } from "./db";
+import { getApartments, getAllBookings, cancelBooking, deleteBooking, createManualBooking, getBlocks, blockDay, unblockDay, getAllReviews, setReviewHidden, setReviewReply, saveApartment, deleteApartment, requestUploadUrl, addPhoto, getPhotos, deletePhoto, setPhotoOrder } from "./db";
 import { MapPicker } from "./maps";
 import { TelegramLoginButton } from "./telegram-button";
 
@@ -79,7 +79,7 @@ function SourceTag({ src, lang, STR }) {
   return <span className="inline-flex items-center gap-1.5 px-2.5 h-6 rounded-full text-[11.5px] font-bold" style={{ color: s.color, background: s.bg }}><span className="w-1.5 h-1.5 rounded-full" style={{ background: s.color }} />{STR[lang][s.key]}</span>;
 }
 
-function BookingRow({ b, lang, STR, onCancel, apartments }) {
+function BookingRow({ b, lang, STR, onCancel, onDelete, apartments }) {
   const apt = (apartments || []).find((a) => a.id === b.apt) || aptById(b.apt);
   if (!apt) return null;
   return (
@@ -91,6 +91,7 @@ function BookingRow({ b, lang, STR, onCancel, apartments }) {
       </div>
       <div className="text-right shrink-0 hidden sm:block"><div className="font-bold text-[15px] tnum">${b.total}</div><div className="text-[11px] text-inksoft tnum">{b.phone}</div></div>
       {onCancel && b.status === "active" && <button onClick={() => onCancel(b)} className="shrink-0 text-[12.5px] font-semibold text-red-600 px-3 h-8 rounded-full hover:bg-red-50">{STR[lang].a_cancel}</button>}
+      {onDelete && <button onClick={() => onDelete(b)} title={lang === "ru" ? "Удалить" : lang === "uz" ? "Oʻchirish" : "Delete"} className="shrink-0 w-8 h-8 grid place-items-center rounded-full text-inksoft hover:text-red-600 hover:bg-red-50"><Icon name="trash" size={15} /></button>}
     </div>
   );
 }
@@ -167,13 +168,19 @@ function BookingsList({ lang, STR, bookings, apartments, onChanged }) {
     setItems((arr) => arr.map((i) => (i.id === x.id ? { ...i, status: "cancelled" } : i)));
     await cancelBooking(x.id);
   }
+  async function del(x) {
+    const msg = lang === "ru" ? "Удалить эту бронь навсегда?" : lang === "uz" ? "Bu bronni butunlay oʻchirilsinmi?" : "Delete this booking permanently?";
+    if (!window.confirm(msg)) return;
+    setItems((arr) => arr.filter((i) => i.id !== x.id));
+    try { await deleteBooking(x.id); } catch (e) { console.error("deleteBooking failed:", e); }
+  }
   return (
     <div>
       <div className="flex justify-end mb-4"><Button icon="plusbox" onClick={() => setAdding(true)}>{lang === "ru" ? "Добавить бронь" : lang === "uz" ? "Bron qoʻshish" : "Add booking"}</Button></div>
       <div className="space-y-2">
         {items.length === 0
           ? <div className="text-[14px] text-inksoft py-8 text-center border border-dashed border-line rounded-2xl">—</div>
-          : items.map((b) => <BookingRow key={b.id} b={b} lang={lang} STR={STR} onCancel={cancel} apartments={apartments} />)}
+          : items.map((b) => <BookingRow key={b.id} b={b} lang={lang} STR={STR} onCancel={cancel} onDelete={del} apartments={apartments} />)}
       </div>
       <Sheet open={adding} onClose={() => setAdding(false)} title={lang === "ru" ? "Ручная бронь" : lang === "uz" ? "Qoʻlda bron" : "Manual booking"} desktop>
         <ManualBookingForm lang={lang} STR={STR} apartments={apartments} onDone={() => { setAdding(false); onChanged && onChanged(); }} />
@@ -197,6 +204,10 @@ function Listings({ lang, STR, onEdit, apartments }) {
             <div className="p-3.5">
               <div className="font-serif text-[15px] leading-snug truncate">{a.title[lang]}</div>
               <div className="text-[12.5px] text-inksoft mt-1">{M.DISTRICTS[a.district][lang]} · {STR[lang].sleeps(a.sleeps)}</div>
+              {/* admin-only: apartment id (click to copy) — used for the Beds24 room mapping */}
+              <span onClick={(e) => { e.stopPropagation(); navigator.clipboard?.writeText(a.id); }}
+                title={lang === "ru" ? "Скопировать ID" : lang === "uz" ? "ID nusxa olish" : "Copy ID"}
+                className="inline-block mt-2 text-[11px] font-mono text-inksoft/80 bg-black/[.04] px-1.5 py-0.5 rounded cursor-copy hover:bg-black/[.08] select-all">{a.id}</span>
             </div>
           </button>
         ))}

@@ -206,6 +206,14 @@ export async function cancelBooking(id) {
   return !error;
 }
 
+// hard-delete a booking (admin only; for removing test/sample/junk rows — real cancellations
+// use cancelBooking which keeps the row with status='cancelled')
+export async function deleteBooking(id) {
+  const sb = createClient();
+  const { error } = await sb.from("bookings").delete().eq("id", id);
+  if (error) throw error;
+}
+
 // admin records an external booking (verbal / OLX / Booking.com) — counts toward revenue
 export async function createManualBooking({ apartmentId, guestName, phone, from, to, total, source }) {
   const sb = createClient();
