@@ -19,6 +19,13 @@ export function AptCard({ apt, lang, STR, filters, onOpen, device, saved, onTogg
   const d = M.DISTRICTS[apt.district];
   const nights = filters?.range?.from && filters?.range?.to ? nightsBetween(filters.range.from, filters.range.to) : 0;
   const fav = !!saved;
+  const [copied, setCopied] = useState(false);
+  const copyId = (e) => {
+    e.stopPropagation();
+    navigator.clipboard?.writeText(apt.id);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1200);
+  };
   return (
     <div role="button" tabIndex={0} onClick={() => onOpen(apt)} onKeyDown={(e) => e.key === "Enter" && onOpen(apt)} className="group text-left w-full fade-up cursor-pointer">
       <div className="relative aspect-[4/3] rounded-2xl overflow-hidden shadow-card">
@@ -51,6 +58,17 @@ export function AptCard({ apt, lang, STR, filters, onOpen, device, saved, onTogg
             <Icon name="check" size={14} sw={2.2} />${apt.price * nights} · {STR[lang].night_n(nights)}
           </div>
         )}
+        {/* apartment id — so a guest can tell the host exactly which apartment they mean */}
+        <div className="flex items-center justify-between gap-2 mt-2.5 pt-2 border-t border-line/60">
+          <span className="text-[11px] font-mono text-inksoft/75 truncate"><span className="text-inksoft/50">ID:</span> <span className="select-all">{apt.id}</span></span>
+          <span role="button" tabIndex={0} onClick={copyId} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") copyId(e); }}
+            title={lang === "ru" ? "Скопировать ID" : lang === "uz" ? "ID nusxa olish" : "Copy ID"}
+            className="shrink-0 w-6 h-6 grid place-items-center rounded text-inksoft hover:text-ink hover:bg-black/6 cursor-pointer">
+            {copied
+              ? <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#1B5E40" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
+              : <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>}
+          </span>
+        </div>
       </div>
     </div>
   );
