@@ -2,7 +2,7 @@
 // Optional: WEBHOOK_URL env to override (defaults to the live Vercel URL).
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const SECRET = process.env.TELEGRAM_WEBHOOK_SECRET;
-const URL = process.env.WEBHOOK_URL || "https://maskan-auto.vercel.app/api/telegram/webhook";
+const URL = process.env.WEBHOOK_URL || "https://maskan-24.uz/api/telegram/webhook";
 if (!TOKEN) { console.error("❌ TELEGRAM_BOT_TOKEN .env.local da yo'q"); process.exit(1); }
 
 const body = { url: URL, allowed_updates: ["message"], drop_pending_updates: true };

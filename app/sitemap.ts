@@ -1,7 +1,6 @@
 import type { MetadataRoute } from "next";
 import { createClient } from "@supabase/supabase-js";
-
-const BASE = "https://maskan-auto.vercel.app";
+import { SITE_URL as BASE } from "@/lib/site-url";
 
 export const revalidate = 3600; // refresh the apartment list hourly without a redeploy
 

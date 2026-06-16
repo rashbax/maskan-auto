@@ -36,7 +36,7 @@ export async function GET(req: Request) {
 
 // One-time invite-code → refresh-token exchange. The refresh token is long-lived and powerful, so
 // keep it out of URLs/history/logs: key goes in a header, invite code in the body, never cached.
-//   curl -X POST https://maskan-auto.vercel.app/api/beds24/diag \
+//   curl -X POST https://maskan-24.uz/api/beds24/diag \
 //        -H "x-beds24-diag-key: <KEY>" -H "content-type: application/json" -d '{"code":"<INVITE>"}'
 export async function POST(req: Request) {
   if (!KEY) return json({ error: "diag_disabled" }, 503);

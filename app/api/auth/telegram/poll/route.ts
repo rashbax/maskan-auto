@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createHash } from "crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { mintTelegramSession } from "@/lib/telegram-session";
+import { SITE_URL } from "@/lib/site-url";
 
 export const runtime = "nodejs";
 
@@ -42,10 +43,9 @@ export async function GET(req: NextRequest) {
   // URL (never the request headers); only dev uses the request host (localhost).
   const host = req.headers.get("x-forwarded-host") || req.headers.get("host") || req.nextUrl.host;
   const proto = req.headers.get("x-forwarded-proto") || (host.includes("localhost") ? "http" : "https");
-  const origin = (
-    process.env.SITE_URL ||
-    (process.env.NODE_ENV === "production" ? "https://maskan-auto.vercel.app" : `${proto}://${host}`)
-  ).replace(/\/$/, "");
+  const origin =
+    process.env.SITE_URL?.replace(/\/$/, "") ||
+    (process.env.NODE_ENV === "production" ? SITE_URL : `${proto}://${host}`);
 
   const link = await mintTelegramSession(
     { id: claimed.telegram_id, first_name: claimed.first_name, last_name: claimed.last_name, username: claimed.username, photo_url: claimed.photo_url },

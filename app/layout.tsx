@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Manrope, Spectral } from "next/font/google";
+import { SITE_URL } from "@/lib/site-url";
 import "./globals.css";
 
 const manrope = Manrope({
@@ -18,7 +19,7 @@ const spectral = Spectral({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://maskan-auto.vercel.app"),
+  metadataBase: new URL(SITE_URL),
   title: "Maskan — Kunlik kvartiralar, Toshkent",
   description:
     "Haqiqiy rasmlar, halol narx, lahzada band qilish. Toshkentda kunlik kvartiralar — qoʻngʻiroqlarsiz.",

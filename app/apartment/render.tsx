@@ -6,10 +6,10 @@ import { AptReserve } from "@/maskan/apt-reserve";
 import { Gallery } from "@/maskan/gallery";
 import { SaveButton, ReviewWidget } from "@/maskan/apt-actions";
 import { Description } from "@/maskan/description";
+import { SITE_URL as BASE } from "@/lib/site-url";
 
 export type Locale = "uz" | "ru" | "en";
 export const LOCALES: Locale[] = ["uz", "ru", "en"];
-const BASE = "https://maskan-auto.vercel.app";
 
 // normalise CRLF/CR → LF so whitespace-pre-line renders the same across browsers (Yandex/Chromium
 // can otherwise show a stray carriage return as a broken line break / extra space).
