@@ -178,8 +178,15 @@ function BookingsList({ lang, STR, bookings, apartments, onChanged }) {
   const [adding, setAdding] = useState(false);
   useEffect(() => { setItems(bookings || []); }, [bookings]);
   async function cancel(x) {
+    const prev = x.status;
     setItems((arr) => arr.map((i) => (i.id === x.id ? { ...i, status: "cancelled" } : i)));
-    await cancelBooking(x.id);
+    try {
+      await cancelBooking(x.id);
+    } catch (e) {
+      console.error("cancelBooking failed:", e);
+      setItems((arr) => arr.map((i) => (i.id === x.id ? { ...i, status: prev } : i)));
+      window.alert(lang === "ru" ? "Не удалось отменить (Beds24)." : lang === "uz" ? "Bekor qilib boʻlmadi (Beds24)." : "Cancel failed (Beds24).");
+    }
   }
   async function del(x) {
     const msg = lang === "ru" ? "Удалить эту бронь навсегда?" : lang === "uz" ? "Bu bronni butunlay oʻchirilsinmi?" : "Delete this booking permanently?";

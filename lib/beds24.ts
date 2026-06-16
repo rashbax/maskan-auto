@@ -65,9 +65,14 @@ export function getBookings(params: Record<string, string>) {
   return b24<{ success?: boolean; data?: Beds24Booking[] }>(`/bookings?${qs}`);
 }
 
-// OUTBOUND: push a booking so Beds24 closes the dates on connected OTAs. Beds24 accepts an array.
+// OUTBOUND: create/update bookings. Beds24 accepts an array; including `id` updates an existing row.
+export function writeBookings(bookings: Beds24BookingWrite[]) {
+  return b24<unknown>("/bookings", { method: "POST", body: JSON.stringify(bookings) });
+}
+
+// OUTBOUND: push a booking so Beds24 closes the dates on connected OTAs.
 export function pushBooking(booking: Beds24BookingWrite) {
-  return b24<unknown>("/bookings", { method: "POST", body: JSON.stringify([booking]) });
+  return writeBookings([booking]);
 }
 
 // Minimal shapes we rely on (Beds24 returns many more fields).
@@ -84,6 +89,7 @@ export interface Beds24Booking {
 }
 
 export interface Beds24BookingWrite {
+  id?: number | string;
   roomId: number;
   propertyId?: number;
   status: string; // "confirmed" to block the dates

@@ -203,17 +203,26 @@ export async function getAllBookings() {
 }
 
 export async function cancelBooking(id) {
-  const sb = createClient();
-  const { error } = await sb.from("bookings").update({ status: "cancelled" }).eq("id", id);
-  return !error;
+  const res = await fetch(`/api/bookings/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ status: "cancelled" }),
+  });
+  if (!res.ok) {
+    const j = await res.json().catch(() => ({}));
+    throw new Error(j.error || "cancel_failed");
+  }
+  return true;
 }
 
 // hard-delete a booking (admin only; for removing test/sample/junk rows — real cancellations
 // use cancelBooking which keeps the row with status='cancelled')
 export async function deleteBooking(id) {
-  const sb = createClient();
-  const { error } = await sb.from("bookings").delete().eq("id", id);
-  if (error) throw error;
+  const res = await fetch(`/api/bookings/${encodeURIComponent(id)}`, { method: "DELETE" });
+  if (!res.ok) {
+    const j = await res.json().catch(() => ({}));
+    throw new Error(j.error || "delete_failed");
+  }
 }
 
 // admin records an external booking (verbal / OLX / Booking.com) — counts toward revenue
