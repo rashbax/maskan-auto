@@ -8,6 +8,8 @@ import { StarRow } from "./reviews";
 import { getApartments, getAllBookings, cancelBooking, deleteBooking, createManualBooking, getBlocks, blockDay, unblockDay, getAllReviews, setReviewHidden, setReviewReply, saveApartment, deleteApartment, requestUploadUrl, addPhoto, getPhotos, deletePhoto, setPhotoOrder } from "./db";
 import { MapPicker } from "./maps";
 import { TelegramLoginButton } from "./telegram-button";
+import { PropertyFilesSection } from "./property-file";
+import { SuppliersSection } from "./suppliers";
 
 const SRC = {
   website: { color: "#1B5E40", bg: "#EAF1EC", key: "src_website" },
@@ -50,6 +52,9 @@ function Dashboard({ lang, STR, bookings, apartments }) {
   const today = M.iso(M.TODAY);
   const list = bookings || [];
   const todays = list.filter((b) => b.from === today);
+  // currently staying: checked in earlier and not yet checked out (would otherwise vanish from
+  // the dashboard the day after check-in, since it's neither "today" nor "upcoming")
+  const staying = list.filter((b) => b.from < today && b.to > today && b.status === "active");
   const upcoming = list.filter((b) => b.from > today && b.status === "active");
   const revenue = list.filter((b) => b.status !== "cancelled").reduce((s, b) => s + (b.total || 0), 0);
   // real occupancy: booked nights that fall in THIS month / (apartments × days in month)
@@ -79,6 +84,12 @@ function Dashboard({ lang, STR, bookings, apartments }) {
           <div className="space-y-2">{todays.map((b) => <BookingRow key={b.id} b={b} lang={lang} STR={STR} apartments={apartments} />)}</div>
         )}
       </div>
+      {staying.length > 0 && (
+        <div>
+          <h3 className="font-serif text-[19px] mb-3">{STR[lang].a_staying}</h3>
+          <div className="space-y-2">{staying.map((b) => <BookingRow key={b.id} b={b} lang={lang} STR={STR} apartments={apartments} />)}</div>
+        </div>
+      )}
       <div>
         <h3 className="font-serif text-[19px] mb-3">{STR[lang].a_upcoming}</h3>
         <div className="space-y-2">{upcoming.map((b) => <BookingRow key={b.id} b={b} lang={lang} STR={STR} apartments={apartments} />)}</div>
@@ -769,7 +780,7 @@ function AdminGate({ lang, STR, onLogin, onExit }) {
 export function Admin({ lang, STR, device, onExit, openLang, role, auth, onLogin }) {
   const [tab, setTab] = useState(() => {
     const parts = (typeof window !== "undefined" ? (window.location.hash || "") : "").replace(/^#/, "").split("/");
-    return parts[0] === "admin" && ["dash", "list", "cal", "book", "reviews"].includes(parts[1]) ? parts[1] : "dash";
+    return parts[0] === "admin" && ["dash", "list", "cal", "book", "reviews", "pfile", "suppliers"].includes(parts[1]) ? parts[1] : "dash";
   });
   const [editId, setEditId] = useState(null);
   const [apts, setApts] = useState([]);
@@ -784,7 +795,7 @@ export function Admin({ lang, STR, device, onExit, openLang, role, auth, onLogin
     const onPop = (e) => {
       const parts = (window.location.hash || "").replace(/^#/, "").split("/");
       if (parts[0] !== "admin") return; // leaving admin — the App-level handler switches screens
-      setTab(["dash", "list", "cal", "book", "reviews"].includes(parts[1]) ? parts[1] : "dash");
+      setTab(["dash", "list", "cal", "book", "reviews", "pfile", "suppliers"].includes(parts[1]) ? parts[1] : "dash");
       setEditId((e.state && e.state.editId) || null);
     };
     window.addEventListener("popstate", onPop);
@@ -811,8 +822,10 @@ export function Admin({ lang, STR, device, onExit, openLang, role, auth, onLogin
     { k: "cal", label: STR[lang].a_calendar, icon: "cal" },
     { k: "book", label: STR[lang].a_bookings, icon: "list" },
     { k: "reviews", label: STR[lang].reviews_title, icon: "star" },
+    { k: "pfile", label: STR[lang].a_pfile, icon: "clipboard" },
+    { k: "suppliers", label: STR[lang].a_suppliers, icon: "truck" },
   ];
-  const titles = { dash: STR[lang].a_dashboard, list: STR[lang].a_listings, cal: STR[lang].a_calendar, book: STR[lang].a_bookings, reviews: STR[lang].a_moderate };
+  const titles = { dash: STR[lang].a_dashboard, list: STR[lang].a_listings, cal: STR[lang].a_calendar, book: STR[lang].a_bookings, reviews: STR[lang].a_moderate, pfile: STR[lang].a_pfile, suppliers: STR[lang].a_suppliers };
 
   return (
     <div className="min-h-screen bg-canvas flex relative">
@@ -846,6 +859,8 @@ export function Admin({ lang, STR, device, onExit, openLang, role, auth, onLogin
             : tab === "list" ? <Listings lang={lang} STR={STR} onEdit={goEdit} apartments={apts} />
             : tab === "cal" ? <CalManager lang={lang} STR={STR} apartments={apts} bookings={bookings} />
             : tab === "reviews" ? <ReviewsModeration lang={lang} STR={STR} apartments={apts} />
+            : tab === "pfile" ? <PropertyFilesSection lang={lang} STR={STR} apartments={apts} />
+            : tab === "suppliers" ? <SuppliersSection lang={lang} STR={STR} />
             : <BookingsList lang={lang} STR={STR} bookings={bookings} apartments={apts} onChanged={() => getAllBookings().then(setBookings)} />}
         </main>
       </div>

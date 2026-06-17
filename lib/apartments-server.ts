@@ -8,9 +8,10 @@ export const getApartmentFull = cache(async (id: string) => {
   const { data: a } = await sb.from("apartments").select("*").eq("id", id).eq("status", "active").single();
   if (!a) return null;
 
-  const [{ data: photos }, { data: reviews }] = await Promise.all([
+  const [{ data: photos }, { data: reviews }, { data: busy }] = await Promise.all([
     sb.from("apartment_photos").select("url,sort,is_cover").eq("apartment_id", id),
     sb.from("reviews").select("*").eq("apartment_id", id).eq("hidden", false).order("created_at", { ascending: false }),
+    sb.rpc("busy_dates_for", { p_apartment_id: id }),
   ]);
 
   const photoUrls = (photos || [])
@@ -42,6 +43,7 @@ export const getApartmentFull = cache(async (id: string) => {
     lng: a.lng != null ? Number(a.lng) : undefined,
     photos: a.photos_count || photoUrls.length || 0,
     photoUrls,
+    busyDates: ((busy || []) as { d: string }[]).map((r) => r.d),
     reviewsList: (reviews || []).map((r) => ({
       name: r.name, country: r.country, rating: r.rating,
       date: (r.created_at || "").slice(0, 10), cons: r.cons || "", text: r.text || "", hostReply: r.host_reply || "",

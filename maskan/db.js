@@ -333,11 +333,111 @@ export async function saveApartment(row, address) {
   if (address != null && address !== "") {
     await sb.from("apartment_private").upsert({ apartment_id: row.id, address });
   }
+  // keep a 1:1 (blank) property file in sync with the listing — never overwrites an
+  // existing one (ON CONFLICT DO NOTHING). Title/district/cover stay derived from the
+  // apartment, so there is nothing to copy here.
+  await sb.from("property_files").upsert({ apartment_id: row.id }, { onConflict: "apartment_id", ignoreDuplicates: true });
   return row.id;
 }
 
 export async function deleteApartment(id) {
   const sb = createClient();
   const { error } = await sb.from("apartments").delete().eq("id", id);
+  if (error) throw error;
+}
+
+// ---------- admin: property files (per-apartment internal ops; admin-only RLS) ----------
+// 1:1 with an apartment via apartment_id (nullable: a file may exist standalone before
+// a listing). Linked files derive title/district/cover live from the apartment.
+export async function getPropertyFiles() {
+  const sb = createClient();
+  const { data, error } = await sb.from("property_files").select("*").order("created_at");
+  if (error) return [];
+  return (data || []).map((r) => ({
+    id: r.id,
+    apartmentId: r.apartment_id || null,
+    name: r.name || "",
+    district: r.district || "",
+    ownerName: r.owner_name || "",
+    ownerPhone: r.owner_phone || "",
+    leaseStart: r.lease_start || "",
+    leaseEnd: r.lease_end || "",
+    depositUzs: r.deposit_uzs ?? "",
+    rentAmount: r.rent_amount ?? "",
+    rentCurrency: r.rent_currency || "UZS",
+    rentDay: r.rent_day ?? 1,
+    rentLastPaid: r.rent_last_paid || "",
+    electricMeterNo: r.electric_meter_no || "",
+    electricLastReading: r.electric_last_reading || "",
+    gasAccount: r.gas_account || "",
+    waterAccount: r.water_account || "",
+    internetProvider: r.internet_provider || "",
+    internetAccount: r.internet_account || "",
+    hoaFeeUzs: r.hoa_fee_uzs ?? "",
+    floor: r.floor || "",
+    intercomCode: r.intercom_code || "",
+    keyboxCode: r.keybox_code || "",
+    keySets: r.key_sets ?? 1,
+    notes: r.notes || "",
+  }));
+}
+
+export async function savePropertyFile(f) {
+  const sb = createClient();
+  const num = (v) => (v === "" || v == null ? null : Number(v));
+  const row = {
+    apartment_id: f.apartmentId || null,
+    // linked files take their name/district from the apartment — keep these null
+    name: f.apartmentId ? null : (f.name || null),
+    district: f.apartmentId ? null : (f.district || null),
+    owner_name: f.ownerName || null,
+    owner_phone: f.ownerPhone || null,
+    lease_start: f.leaseStart || null,
+    lease_end: f.leaseEnd || null,
+    deposit_uzs: num(f.depositUzs),
+    rent_amount: num(f.rentAmount),
+    rent_currency: f.rentCurrency === "USD" ? "USD" : "UZS",
+    rent_day: num(f.rentDay) || 1,
+    rent_last_paid: f.rentLastPaid || null,
+    electric_meter_no: f.electricMeterNo || null,
+    electric_last_reading: f.electricLastReading || null,
+    gas_account: f.gasAccount || null,
+    water_account: f.waterAccount || null,
+    internet_provider: f.internetProvider || null,
+    internet_account: f.internetAccount || null,
+    hoa_fee_uzs: num(f.hoaFeeUzs),
+    floor: f.floor || null,
+    intercom_code: f.intercomCode || null,
+    keybox_code: f.keyboxCode || null,
+    key_sets: num(f.keySets) || 1,
+    notes: f.notes || null,
+    updated_at: new Date().toISOString(),
+  };
+  if (f.id) row.id = f.id;
+  const { data, error } = await sb.from("property_files").upsert(row).select("id").single();
+  if (error) throw error;
+  return data.id;
+}
+
+// ---------- admin: suppliers (name / product / contact; admin-only RLS) ----------
+export async function getSuppliers() {
+  const sb = createClient();
+  const { data, error } = await sb.from("suppliers").select("*").order("created_at");
+  if (error) return [];
+  return (data || []).map((s) => ({ id: s.id, name: s.name || "", product: s.product || "", contact: s.contact || "" }));
+}
+
+export async function saveSupplier(s) {
+  const sb = createClient();
+  const row = { name: s.name || null, product: s.product || null, contact: s.contact || null };
+  if (s.id) row.id = s.id;
+  const { data, error } = await sb.from("suppliers").upsert(row).select("id").single();
+  if (error) throw error;
+  return data.id;
+}
+
+export async function deleteSupplier(id) {
+  const sb = createClient();
+  const { error } = await sb.from("suppliers").delete().eq("id", id);
   if (error) throw error;
 }

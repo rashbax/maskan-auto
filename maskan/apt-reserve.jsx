@@ -21,7 +21,7 @@ export function AptReserve({ apt, lang: langProp }) {
   const STR = MASKAN.STR;
   const langLocal = useLang();
   const lang = langProp || langLocal;
-  const [busy, setBusy] = useState(new Set());
+  const [busy, setBusy] = useState(() => new Set(apt.busyDates || []));
   const [range, setRange] = useState({ from: null, to: null });
   const [booking, setBooking] = useState(false);
   const [desktop, setDesktop] = useState(false);
