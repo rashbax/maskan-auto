@@ -5,6 +5,11 @@ import { beds24Enabled, pushBooking } from "@/lib/beds24";
 
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const CHAT = process.env.TELEGRAM_OWNER_CHAT_ID;
+const DAY = 86400000;
+
+function addDays(iso: string, days: number) {
+  return new Date(Date.parse(`${iso}T00:00:00Z`) + days * DAY).toISOString().slice(0, 10);
+}
 
 // Notify the host of a new booking. Idempotent: claims notified_at atomically so it can't be
 // sent twice; releases the claim if the send fails so it can be retried.
@@ -149,6 +154,119 @@ export async function cancelInBeds24(id: string) {
       departure: b.checkout,
       firstName: b.guest_name || "Maskan guest",
       notes: `Maskan ${b.id} cancelled from site`,
+    });
+    await log(true, JSON.stringify(resp));
+    return { ok: true, response: resp };
+  } catch (e) {
+    await log(false, String(e));
+    return { ok: false, error: String(e) };
+  }
+}
+
+// Mirror an owner calendar block into Beds24 as a black booking. This closes the night on
+// connected OTAs without creating a guest booking in Maskan.
+export async function pushBlockToBeds24(id: string) {
+  if (!beds24Enabled()) return { ok: true, skipped: "beds24_not_configured" };
+  const sb = createAdminClient();
+  const { data: block } = await sb
+    .from("availability_blocks")
+    .select("id,apartment_id,date,beds24_booking_id")
+    .eq("id", id)
+    .single();
+  if (!block) return { ok: false, error: "block_not_found" };
+  if (block.beds24_booking_id) return { ok: true, skipped: "already_synced", beds24Id: block.beds24_booking_id };
+
+  const { data: apt } = await sb
+    .from("apartments")
+    .select("beds24_room_id, beds24_prop_id")
+    .eq("id", block.apartment_id)
+    .single();
+  const roomId = apt?.beds24_room_id ? Number(apt.beds24_room_id) : null;
+
+  const log = (ok: boolean, detail: string, beds24Id?: string | null) =>
+    sb.from("beds24_sync_log").insert({
+      direction: "outbound",
+      beds24_booking_id: beds24Id ?? null,
+      booking_id: `BLOCK:${block.id}`,
+      apartment_id: block.apartment_id,
+      action: "block_push",
+      ok,
+      detail: detail.slice(0, 500),
+    });
+
+  if (!roomId) return { ok: true, skipped: "missing_beds24_room_id" };
+
+  try {
+    const resp = await pushBooking({
+      roomId,
+      ...(apt?.beds24_prop_id ? { propertyId: Number(apt.beds24_prop_id) } : {}),
+      status: "black",
+      arrival: block.date,
+      departure: addDays(block.date, 1),
+      firstName: "Maskan",
+      lastName: "Block",
+      notes: `Maskan block ${block.id}`,
+    });
+    const r = (Array.isArray(resp) ? resp[0] : resp) as { new?: { id?: number }; id?: number; bookId?: number } | undefined;
+    const newId = r?.new?.id ?? r?.id ?? r?.bookId;
+    if (!newId) {
+      await log(false, JSON.stringify(resp));
+      return { ok: false, error: "beds24_missing_block_id", response: resp };
+    }
+    await sb.from("availability_blocks").update({ beds24_booking_id: String(newId) }).eq("id", id);
+    await log(true, JSON.stringify(resp), String(newId));
+    return { ok: true, beds24Id: String(newId), response: resp };
+  } catch (e) {
+    await log(false, String(e));
+    return { ok: false, error: String(e) };
+  }
+}
+
+export async function cancelBlockInBeds24(id: string) {
+  if (!beds24Enabled()) return { ok: true, skipped: "beds24_not_configured" };
+  const sb = createAdminClient();
+  const { data: block } = await sb
+    .from("availability_blocks")
+    .select("id,apartment_id,date,beds24_booking_id")
+    .eq("id", id)
+    .single();
+  if (!block) return { ok: false, error: "block_not_found" };
+  if (!block.beds24_booking_id) return { ok: true, skipped: "no_beds24_booking_id" };
+
+  const { data: apt } = await sb
+    .from("apartments")
+    .select("beds24_room_id, beds24_prop_id")
+    .eq("id", block.apartment_id)
+    .single();
+  const roomId = apt?.beds24_room_id ? Number(apt.beds24_room_id) : null;
+
+  const log = (ok: boolean, detail: string) =>
+    sb.from("beds24_sync_log").insert({
+      direction: "outbound",
+      beds24_booking_id: block.beds24_booking_id,
+      booking_id: `BLOCK:${block.id}`,
+      apartment_id: block.apartment_id,
+      action: "block_cancel",
+      ok,
+      detail: detail.slice(0, 500),
+    });
+
+  if (!roomId) {
+    await log(false, "missing_beds24_room_id");
+    return { ok: false, error: "missing_beds24_room_id" };
+  }
+
+  try {
+    const resp = await pushBooking({
+      id: /^\d+$/.test(String(block.beds24_booking_id)) ? Number(block.beds24_booking_id) : String(block.beds24_booking_id),
+      roomId,
+      ...(apt?.beds24_prop_id ? { propertyId: Number(apt.beds24_prop_id) } : {}),
+      status: "cancelled",
+      arrival: block.date,
+      departure: addDays(block.date, 1),
+      firstName: "Maskan",
+      lastName: "Block",
+      notes: `Maskan block ${block.id} opened from site`,
     });
     await log(true, JSON.stringify(resp));
     return { ok: true, response: resp };

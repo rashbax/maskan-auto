@@ -113,8 +113,17 @@ function departure(b: Beds24Record) {
   return pickString(b, ["departure", "checkOut", "checkout", "departureDate"]);
 }
 
+function rawStatusOf(b: Beds24Record) {
+  return (pickString(b, ["status", "bookingStatus"]) || "confirmed").toLowerCase();
+}
+
+function isManualBlock(b: Beds24Record) {
+  const status = rawStatusOf(b);
+  return status.includes("black") || status.includes("block");
+}
+
 function statusOf(b: Beds24Record) {
-  const status = (pickString(b, ["status", "bookingStatus"]) || "confirmed").toLowerCase();
+  const status = rawStatusOf(b);
   if (status.includes("cancel")) return "cancelled";
   return "active";
 }
@@ -192,6 +201,11 @@ export async function GET(req: Request) {
   let errors = 0;
 
   for (const b of rows) {
+    if (isManualBlock(b)) {
+      skipped++;
+      continue;
+    }
+
     const b24Id = beds24Id(b);
     const bRoomId = roomId(b);
     const apt = bRoomId ? roomToApartment.get(bRoomId) : null;

@@ -1,12 +1,16 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { notifyOwner, pushToBeds24 } from "@/lib/booking-effects";
+import { notifyOwner, pushBlockToBeds24, pushToBeds24 } from "@/lib/booking-effects";
 import { beds24Enabled } from "@/lib/beds24";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
 const SECRET = process.env.CRON_SECRET;
+
+function tashkentToday() {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tashkent" }).format(new Date());
+}
 
 // Durable retry for the booking side effects. `after()` in /api/book is best-effort (a crash or
 // max-duration exit can drop it), so Vercel Cron hits this on a schedule and re-runs the IDEMPOTENT
@@ -40,8 +44,19 @@ export async function GET(req: Request) {
         .gte("created_at", since).order("created_at", { ascending: true }).limit(25)
     : { data: [] as { id: string }[], error: null };
 
-  if (notifyErr || pushErr) {
-    console.error("cron booking-sync query failed:", notifyErr || pushErr);
+  const { data: toPushBlocks, error: blockPushErr } = beds24Enabled()
+    ? await sb
+        .from("availability_blocks")
+        .select("id, apartments!inner(beds24_room_id)")
+        .is("beds24_booking_id", null)
+        .not("apartments.beds24_room_id", "is", null)
+        .gte("date", tashkentToday())
+        .order("date", { ascending: true })
+        .limit(25)
+    : { data: [] as { id: string }[], error: null };
+
+  if (notifyErr || pushErr || blockPushErr) {
+    console.error("cron booking-sync query failed:", notifyErr || pushErr || blockPushErr);
     return NextResponse.json({ error: "query_failed" }, { status: 500 });
   }
 
@@ -49,10 +64,15 @@ export async function GET(req: Request) {
   const tasks = [
     ...(toNotify || []).map((b) => () => notifyOwner(b.id as string)),
     ...(toPush || []).map((b) => () => pushToBeds24((b as { id: string }).id)),
+    ...(toPushBlocks || []).map((b) => () => pushBlockToBeds24((b as { id: string }).id)),
   ];
   for (let i = 0; i < tasks.length; i += 5) {
     await Promise.allSettled(tasks.slice(i, i + 5).map((t) => t()));
   }
 
-  return NextResponse.json({ notified: toNotify?.length ?? 0, pushed: toPush?.length ?? 0 });
+  return NextResponse.json({
+    notified: toNotify?.length ?? 0,
+    pushed: toPush?.length ?? 0,
+    blocksPushed: toPushBlocks?.length ?? 0,
+  });
 }

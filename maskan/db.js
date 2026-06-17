@@ -262,16 +262,28 @@ export async function getBlocks(apartmentId) {
   if (error) return new Set();
   return new Set((data || []).map((r) => r.date));
 }
+
+async function blockApi(method, apartmentId, date) {
+  const res = await fetch("/api/availability-blocks", {
+    method,
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ apartmentId, date }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const err = new Error(data?.error || "block_failed");
+    err.code = data?.code;
+    err.detail = data;
+    throw err;
+  }
+  return data;
+}
+
 export async function blockDay(apartmentId, date) {
-  const sb = createClient();
-  // throws (e.g. 23B01) when the day already has an active booking — caller rolls back the UI
-  const { error } = await sb.from("availability_blocks").insert({ apartment_id: apartmentId, date });
-  if (error) throw error;
+  return blockApi("POST", apartmentId, date);
 }
 export async function unblockDay(apartmentId, date) {
-  const sb = createClient();
-  const { error } = await sb.from("availability_blocks").delete().eq("apartment_id", apartmentId).eq("date", date);
-  if (error) throw error;
+  return blockApi("DELETE", apartmentId, date);
 }
 
 // ---------- admin: review moderation (admin sees hidden too via RLS) ----------
