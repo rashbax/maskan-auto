@@ -9,6 +9,7 @@ type ApartmentRow = {
   id: string;
   beds24_prop_id: string | null;
   beds24_room_id: string | null;
+  price_usd: number | null;
 };
 
 type ExistingBooking = {
@@ -193,7 +194,7 @@ export async function syncBeds24Bookings(opts: { from?: string; to?: string; boo
   const sb = createAdminClient();
   const { data: apartments, error: aptErr } = await sb
     .from("apartments")
-    .select("id,beds24_prop_id,beds24_room_id")
+    .select("id,beds24_prop_id,beds24_room_id,price_usd")
     .not("beds24_room_id", "is", null);
   if (aptErr) return { enabled: true, error: "apartments_query_failed" };
 
@@ -237,12 +238,16 @@ export async function syncBeds24Bookings(opts: { from?: string; to?: string; boo
 
     const nights = nightsBetween(checkin!, checkout!);
     const status = statusOf(b);
+    // Price in USD from the listing (price_usd * nights). The Beds24 price comes in the booking's
+    // own currency (often UZS) and is usually absent, so we don't trust it for total_usd; fall back
+    // to it only when the apartment has no listing price.
+    const total_usd = apt.price_usd != null ? Math.round(apt.price_usd * nights) : totalUsd(b);
     const base = {
       apartment_id: apt.id,
       checkin: checkin!,
       checkout: checkout!,
       nights,
-      total_usd: totalUsd(b),
+      total_usd,
       status,
     };
 

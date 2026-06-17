@@ -56,20 +56,25 @@ function Dashboard({ lang, STR, bookings, apartments }) {
   // the dashboard the day after check-in, since it's neither "today" nor "upcoming")
   const staying = list.filter((b) => b.from < today && b.to > today && b.status === "active");
   const upcoming = list.filter((b) => b.from > today && b.status === "active");
-  const revenue = list.filter((b) => b.status !== "cancelled").reduce((s, b) => s + (b.total || 0), 0);
-  // real occupancy: booked nights that fall in THIS month / (apartments × days in month)
+  // real occupancy + revenue for THIS month: only the booked nights that fall inside the month;
+  // revenue is prorated per night so a stay spanning months counts only its in-month nights
   const y = M.TODAY.getFullYear(), mo = M.TODAY.getMonth();
   const daysInMonth = new Date(y, mo + 1, 0).getDate();
   const mStart = new Date(y, mo, 1), mEnd = new Date(y, mo + 1, 1);
-  let bookedNights = 0;
+  let bookedNights = 0, monthRevenue = 0;
   for (const b of list) {
     if (b.status === "cancelled") continue;
     const s = Math.max(new Date(b.from).getTime(), mStart.getTime());
     const e = Math.min(new Date(b.to).getTime(), mEnd.getTime());
-    if (e > s) bookedNights += Math.round((e - s) / 86400000);
+    if (e <= s) continue;
+    const nim = Math.round((e - s) / 86400000);
+    bookedNights += nim;
+    const bNights = b.nights || Math.round((new Date(b.to) - new Date(b.from)) / 86400000) || 1;
+    if (b.total) monthRevenue += (b.total / bNights) * nim;
   }
   const totalNights = (apartments || []).length * daysInMonth;
   const occupancy = totalNights > 0 ? Math.round((bookedNights / totalNights) * 100) : 0;
+  const revenue = Math.round(monthRevenue);
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
