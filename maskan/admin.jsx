@@ -5,7 +5,7 @@ import { Icon, Logo, Button, Chip, Badge, Photo, Stepper, AMENITY_ICON, GoogleG,
 import { calMonths, calWD, buildMonth, dOnly } from "./calendar";
 import { fmtRange } from "./catalog";
 import { StarRow } from "./reviews";
-import { getApartments, getAllBookings, cancelBooking, deleteBooking, createManualBooking, getBlocks, blockDay, unblockDay, getAllReviews, setReviewHidden, setReviewReply, saveApartment, deleteApartment, requestUploadUrl, addPhoto, getPhotos, deletePhoto, setPhotoOrder } from "./db";
+import { getApartments, getAllBookings, cancelBooking, deleteBooking, shortenBooking, createManualBooking, getBlocks, blockDay, unblockDay, getAllReviews, setReviewHidden, setReviewReply, saveApartment, deleteApartment, requestUploadUrl, addPhoto, getPhotos, deletePhoto, setPhotoOrder } from "./db";
 import { MapPicker } from "./maps";
 import { TelegramLoginButton } from "./telegram-button";
 import { PropertyFilesSection } from "./property-file";
@@ -108,7 +108,7 @@ function SourceTag({ src, lang, STR }) {
   return <span className="inline-flex items-center gap-1.5 px-2.5 h-6 rounded-full text-[11.5px] font-bold" style={{ color: s.color, background: s.bg }}><span className="w-1.5 h-1.5 rounded-full" style={{ background: s.color }} />{STR[lang][s.key]}</span>;
 }
 
-function BookingRow({ b, lang, STR, onCancel, onDelete, apartments }) {
+function BookingRow({ b, lang, STR, onCancel, onDelete, onShorten, apartments }) {
   const apt = (apartments || []).find((a) => a.id === b.apt) || aptById(b.apt);
   if (!apt) return null;
   return (
@@ -119,6 +119,7 @@ function BookingRow({ b, lang, STR, onCancel, onDelete, apartments }) {
         <div className="text-[12.5px] text-inksoft truncate">{apt.title[lang]} · {fmtRange(new Date(b.from), new Date(b.to), lang)}</div>
       </div>
       <div className="text-right shrink-0 hidden sm:block"><div className="font-bold text-[15px] tnum">${b.total}</div><div className="text-[11px] text-inksoft tnum">{b.phone}</div></div>
+      {onShorten && b.status === "active" && b.nights > 1 && b.source !== "booking" && <button onClick={() => onShorten(b)} title={lang === "ru" ? "Ранний выезд" : lang === "uz" ? "Erta chiqish" : "Early checkout"} className="shrink-0 w-8 h-8 grid place-items-center rounded-full text-inksoft hover:text-green-700 hover:bg-green-50"><Icon name="clock" size={15} /></button>}
       {onCancel && b.status === "active" && <button onClick={() => onCancel(b)} className="shrink-0 text-[12.5px] font-semibold text-red-600 px-3 h-8 rounded-full hover:bg-red-50">{STR[lang].a_cancel}</button>}
       {onDelete && <button onClick={() => onDelete(b)} title={lang === "ru" ? "Удалить" : lang === "uz" ? "Oʻchirish" : "Delete"} className="shrink-0 w-8 h-8 grid place-items-center rounded-full text-inksoft hover:text-red-600 hover:bg-red-50"><Icon name="trash" size={15} /></button>}
     </div>
@@ -188,10 +189,53 @@ function ManualBookingForm({ lang, STR, apartments, onDone }) {
   );
 }
 
+// ---- early checkout: shorten a stay, prorate the total, show the guest refund ----
+function EarlyCheckoutForm({ lang, STR, b, onDone }) {
+  const M = MASKAN;
+  const T = (ru, uz, en) => (lang === "ru" ? ru : lang === "uz" ? uz : en);
+  const shift = (iso, n) => M.iso(M.addDays(new Date(iso), n));
+  const minDate = shift(b.from, 1);
+  const maxDate = shift(b.to, -1);
+  const todayIso = M.iso(M.TODAY);
+  const [date, setDate] = useState(todayIso < minDate ? minDate : todayIso > maxDate ? maxDate : todayIso);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const oldNights = b.nights || Math.round((new Date(b.to) - new Date(b.from)) / 86400000) || 1;
+  const newNights = date ? Math.max(0, Math.round((new Date(date) - new Date(b.from)) / 86400000)) : 0;
+  const newTotal = b.total != null ? Math.round((b.total / oldNights) * newNights) : null;
+  const refund = b.total != null && newTotal != null ? b.total - newTotal : null;
+  const valid = date && date >= minDate && date <= maxDate && newNights >= 1;
+  const fld = "mt-1.5 w-full h-12 px-4 rounded-xl bg-white border border-line outline-none focus:border-green-600 focus:ring-2 focus:ring-green-600/15 transition text-[15px]";
+  async function submit() {
+    setBusy(true); setErr("");
+    try { onDone(await shortenBooking(b.id, date)); }
+    catch (e) { setErr(e.message || "fail"); setBusy(false); }
+  }
+  return (
+    <div className="space-y-4">
+      <div className="text-[13px] text-inksoft">{b.guest} · {fmtRange(new Date(b.from), new Date(b.to), lang)} · {STR[lang].night_n(oldNights)} · ${b.total ?? "—"}</div>
+      <label className="block">
+        <span className="text-[12px] font-bold text-inksoft">{T("Новая дата выезда", "Yangi chiqish sanasi", "New checkout date")}</span>
+        <input type="date" value={date} min={minDate} max={maxDate} onChange={(e) => setDate(e.target.value)} className={fld + " tnum"} />
+      </label>
+      <div className="rounded-xl bg-cream border border-line p-3.5 text-[13.5px] space-y-1.5">
+        <div className="flex justify-between"><span className="text-inksoft">{T("Ночей", "Kechalar", "Nights")}</span><span className="font-semibold tnum">{oldNights} → {newNights}</span></div>
+        <div className="flex justify-between"><span className="text-inksoft">{T("Новая сумма", "Yangi summa", "New total")}</span><span className="font-semibold tnum">${newTotal ?? "—"}</span></div>
+        <div className="flex justify-between text-green-700 border-t border-line pt-1.5"><span className="font-semibold">{T("К возврату гостю", "Mehmonga qaytariladi", "Refund to guest")}</span><span className="font-bold tnum">${refund ?? "—"}</span></div>
+      </div>
+      {err && <div className="text-[13px] text-[#9a4a3c] bg-red-50 rounded-lg p-3">{err}</div>}
+      <Button full size="lg" icon="check" onClick={submit} disabled={busy || !valid} className={busy || !valid ? "opacity-60 pointer-events-none" : ""}>
+        {busy ? "…" : T("Подтвердить ранний выезд", "Erta chiqishni tasdiqlash", "Confirm early checkout")}
+      </Button>
+    </div>
+  );
+}
+
 // ---- bookings list ----
 function BookingsList({ lang, STR, bookings, apartments, onChanged }) {
   const [items, setItems] = useState(bookings || []);
   const [adding, setAdding] = useState(false);
+  const [shorten, setShorten] = useState(null);
   useEffect(() => { setItems(bookings || []); }, [bookings]);
   async function cancel(x) {
     const prev = x.status;
@@ -210,16 +254,26 @@ function BookingsList({ lang, STR, bookings, apartments, onChanged }) {
     setItems((arr) => arr.filter((i) => i.id !== x.id));
     try { await deleteBooking(x.id); } catch (e) { console.error("deleteBooking failed:", e); }
   }
+  function onShortenDone(r) {
+    if (shorten) {
+      setItems((arr) => arr.map((i) => (i.id === shorten.id ? { ...i, to: r.checkout, nights: r.nights, total: r.total_usd } : i)));
+      window.alert((lang === "ru" ? "К возврату гостю: $" : lang === "uz" ? "Mehmonga qaytariladi: $" : "Refund to guest: $") + (r.refund ?? 0));
+    }
+    setShorten(null);
+  }
   return (
     <div>
       <div className="flex justify-end mb-4"><Button icon="plusbox" onClick={() => setAdding(true)}>{lang === "ru" ? "Добавить бронь" : lang === "uz" ? "Bron qoʻshish" : "Add booking"}</Button></div>
       <div className="space-y-2">
         {items.length === 0
           ? <div className="text-[14px] text-inksoft py-8 text-center border border-dashed border-line rounded-2xl">—</div>
-          : items.map((b) => <BookingRow key={b.id} b={b} lang={lang} STR={STR} onCancel={cancel} onDelete={del} apartments={apartments} />)}
+          : items.map((b) => <BookingRow key={b.id} b={b} lang={lang} STR={STR} onCancel={cancel} onDelete={del} onShorten={setShorten} apartments={apartments} />)}
       </div>
       <Sheet open={adding} onClose={() => setAdding(false)} title={lang === "ru" ? "Ручная бронь" : lang === "uz" ? "Qoʻlda bron" : "Manual booking"} desktop>
         <ManualBookingForm lang={lang} STR={STR} apartments={apartments} onDone={() => { setAdding(false); onChanged && onChanged(); }} />
+      </Sheet>
+      <Sheet open={!!shorten} onClose={() => setShorten(null)} title={lang === "ru" ? "Ранний выезд" : lang === "uz" ? "Erta chiqish" : "Early checkout"} desktop>
+        {shorten && <EarlyCheckoutForm lang={lang} STR={STR} b={shorten} onDone={onShortenDone} />}
       </Sheet>
     </div>
   );

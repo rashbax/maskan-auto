@@ -275,3 +275,55 @@ export async function cancelBlockInBeds24(id: string) {
     return { ok: false, error: String(e) };
   }
 }
+
+// Early checkout: shorten a website-origin booking's Beds24 mirror so the freed nights reopen on
+// the OTAs. OTA-origin bookings are owned by the channel and are left untouched here.
+export async function shortenInBeds24(id: string, newCheckout: string) {
+  if (!beds24Enabled()) return { ok: true, skipped: "beds24_not_configured" };
+  const sb = createAdminClient();
+  const { data: b } = await sb.from("bookings").select("*").eq("id", id).single();
+  if (!b) return { ok: false, error: "booking_not_found" };
+  if (b.source !== "website") return { ok: true, skipped: "not_website_source" };
+  if (!b.beds24_booking_id) return { ok: true, skipped: "no_beds24_booking_id" };
+
+  const { data: apt } = await sb
+    .from("apartments")
+    .select("beds24_room_id, beds24_prop_id")
+    .eq("id", b.apartment_id)
+    .single();
+  const roomId = apt?.beds24_room_id ? Number(apt.beds24_room_id) : null;
+
+  const log = (ok: boolean, detail: string) =>
+    sb.from("beds24_sync_log").insert({
+      direction: "outbound",
+      beds24_booking_id: b.beds24_booking_id,
+      booking_id: id,
+      apartment_id: b.apartment_id,
+      action: "shorten",
+      ok,
+      detail: detail.slice(0, 500),
+    });
+
+  if (!roomId) {
+    await log(false, "missing_beds24_room_id");
+    return { ok: false, error: "missing_beds24_room_id" };
+  }
+
+  try {
+    const resp = await pushBooking({
+      id: /^\d+$/.test(String(b.beds24_booking_id)) ? Number(b.beds24_booking_id) : String(b.beds24_booking_id),
+      roomId,
+      ...(apt?.beds24_prop_id ? { propertyId: Number(apt.beds24_prop_id) } : {}),
+      status: "confirmed",
+      arrival: b.checkin,
+      departure: newCheckout,
+      firstName: b.guest_name || "Maskan guest",
+      notes: `Maskan ${b.id} shortened to ${newCheckout}`,
+    });
+    await log(true, JSON.stringify(resp));
+    return { ok: true, response: resp };
+  } catch (e) {
+    await log(false, String(e));
+    return { ok: false, error: String(e) };
+  }
+}

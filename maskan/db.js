@@ -225,6 +225,19 @@ export async function deleteBooking(id) {
   }
 }
 
+// early checkout: shorten an active booking to a new checkout. The server prorates the total, frees
+// the remaining nights (and the Beds24 mirror for website bookings) and returns the refund amount.
+export async function shortenBooking(id, checkout) {
+  const res = await fetch(`/api/bookings/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ checkout }),
+  });
+  const j = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(j.error || "shorten_failed");
+  return j; // { ok, checkout, nights, total_usd, refund, beds24 }
+}
+
 // admin records an external booking (verbal / OLX / Booking.com) — counts toward revenue
 export async function createManualBooking({ apartmentId, guestName, phone, from, to, total, source }) {
   const sb = createClient();
