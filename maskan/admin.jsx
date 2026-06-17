@@ -540,9 +540,12 @@ function CalManager({ lang, STR, apartments, bookings }) {
   const [aptId, setAptId] = useState(apts[0]?.id || "a1");
   useEffect(() => { if (apts.length && !apts.find((a) => a.id === aptId)) setAptId(apts[0].id); }, [apts]);
   const apt = apts.find((a) => a.id === aptId);
+  const T = (ru, uz, en) => (lang === "ru" ? ru : lang === "uz" ? uz : en);
   const [view, setView] = useState({ y: M.TODAY.getFullYear(), m: M.TODAY.getMonth() });
-  const [blocked, setBlocked] = useState(new Set());
-  useEffect(() => { getBlocks(aptId).then(setBlocked); }, [aptId]);
+  const [blocked, setBlocked] = useState(new Set()); // saved (DB) state
+  const [draft, setDraft] = useState(new Set());     // working selection — sent only on Save
+  const [saving, setSaving] = useState(false);
+  useEffect(() => { getBlocks(aptId).then((s) => { setBlocked(s); setDraft(new Set(s)); }); }, [aptId]);
   // booking-source map for this apt
   const srcMap = {};
   (bookings || []).filter((b) => b.apt === aptId && b.status === "active").forEach((b) => {
@@ -550,21 +553,27 @@ function CalManager({ lang, STR, apartments, bookings }) {
   });
   const cells = buildMonth(view.y, view.m);
   const today = dOnly(M.TODAY);
-  async function toggle(d) {
+  // a click only toggles the local draft; nothing is sent until Save
+  function toggle(d) {
     const k = M.iso(d);
-    const wasBlocked = blocked.has(k);
-    const next = new Set(blocked);
-    if (wasBlocked) next.delete(k); else next.add(k);
-    setBlocked(next); // optimistic
-    try {
-      if (wasBlocked) await unblockDay(aptId, k);
-      else await blockDay(aptId, k);
-    } catch (e) {
-      setBlocked(blocked); // rollback to the pre-toggle state
-      alert(e?.code === "23B01"
-        ? (lang === "ru" ? "Эта дата уже забронирована — заблокировать нельзя." : lang === "uz" ? "Bu sana band qilingan — bloklab boʻlmaydi." : "This date already has a booking — can't block it.")
-        : (lang === "ru" ? "Не удалось сохранить. Попробуйте ещё раз." : lang === "uz" ? "Saqlab boʻlmadi. Qayta urining." : "Could not save. Please try again."));
-    }
+    setDraft((prev) => { const next = new Set(prev); if (next.has(k)) next.delete(k); else next.add(k); return next; });
+  }
+  const toBlock = [...draft].filter((k) => !blocked.has(k));
+  const toUnblock = [...blocked].filter((k) => !draft.has(k));
+  const dirty = toBlock.length > 0 || toUnblock.length > 0;
+  async function save() {
+    setSaving(true);
+    const failed = new Set();
+    let booked = false;
+    for (const k of toBlock) { try { await blockDay(aptId, k); } catch (e) { failed.add(k); if (e?.code === "23B01") booked = true; } }
+    for (const k of toUnblock) { try { await unblockDay(aptId, k); } catch { failed.add(k); } }
+    const saved = new Set(blocked);
+    for (const k of toBlock) if (!failed.has(k)) saved.add(k);
+    for (const k of toUnblock) if (!failed.has(k)) saved.delete(k);
+    setBlocked(saved); setDraft(new Set(saved)); setSaving(false);
+    if (failed.size) alert(booked
+      ? T("Некоторые даты уже забронированы — их нельзя закрыть.", "Ba'zi sanalar band — ularni yopib boʻlmaydi.", "Some dates already have a booking — can't block them.")
+      : T("Часть изменений не сохранилась. Повторите.", "Ba'zi oʻzgarishlar saqlanmadi. Qayta urining.", "Some changes didn't save. Try again."));
   }
   function shift(delta) { let m = view.m + delta, y = view.y; if (m < 0) { m = 11; y--; } if (m > 11) { m = 0; y++; } setView({ y, m }); }
   if (!apt) return null;
@@ -583,11 +592,11 @@ function CalManager({ lang, STR, apartments, bookings }) {
         <div className="grid grid-cols-7 gap-1">
           {cells.map((d, i) => {
             if (!d) return <div key={i} />;
-            const k = M.iso(d); const past = d < today; const src = srcMap[k]; const isBlocked = blocked.has(k);
+            const k = M.iso(d); const past = d < today; const src = srcMap[k]; const isBlocked = draft.has(k); const pending = isBlocked !== blocked.has(k);
             const booked = !!src;
             return (
               <button key={i} disabled={past || booked} onClick={() => toggle(d)}
-                className={`aspect-square rounded-lg grid place-items-center text-[13.5px] font-semibold tnum relative transition ${past ? "text-inksoft/25" : booked ? "text-cream" : isBlocked ? "bg-inksoft/15 text-inksoft line-through" : "hover:bg-green-50 text-ink"}`}
+                className={`aspect-square rounded-lg grid place-items-center text-[13.5px] font-semibold tnum relative transition ${past ? "text-inksoft/25" : booked ? "text-cream" : isBlocked ? "bg-inksoft/15 text-inksoft line-through" : "hover:bg-green-50 text-ink"} ${pending ? "ring-2 ring-green-600/70" : ""}`}
                 style={booked ? { background: SRC[src].color } : {}}>{d.getDate()}</button>
             );
           })}
@@ -596,7 +605,13 @@ function CalManager({ lang, STR, apartments, bookings }) {
           {Object.keys(SRC).map((s) => <span key={s} className="inline-flex items-center gap-1.5"><span className="w-3 h-3 rounded" style={{ background: SRC[s].color }} />{STR[lang][SRC[s].key]}</span>)}
           <span className="inline-flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-inksoft/20" />{STR[lang].a_blocked}</span>
         </div>
-        <p className="text-[12.5px] text-inksoft mt-3">{lang === "ru" ? "Нажмите на свободный день, чтобы закрыть или открыть его." : lang === "uz" ? "Kunni yopish yoki ochish uchun bosing." : "Tap a free day to block or open it."}</p>
+        <p className="text-[12.5px] text-inksoft mt-3">{T("Выберите дни (закрыть/открыть), затем нажмите «Сохранить».", "Kunlarni tanlang (yopish/ochish), soʻng «Saqlash»ni bosing.", "Pick days to close/open, then press Save.")}</p>
+        {dirty && (
+          <div className="flex items-center gap-2 mt-4 pt-4 border-t border-line">
+            <Button icon="check" onClick={save} disabled={saving} className={saving ? "opacity-60 pointer-events-none" : ""}>{saving ? "…" : `${T("Сохранить", "Saqlash", "Save")} (${toBlock.length + toUnblock.length})`}</Button>
+            <button onClick={() => setDraft(new Set(blocked))} disabled={saving} className="text-[13px] font-semibold text-inksoft hover:text-ink px-3 h-9 rounded-full hover:bg-black/5">{T("Отмена", "Bekor", "Cancel")}</button>
+          </div>
+        )}
       </div>
     </div>
   );
