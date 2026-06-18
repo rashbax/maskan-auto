@@ -26,6 +26,14 @@ type ExistingBooking = {
   beds24_booking_id: string | null;
 };
 
+type ExistingBlock = {
+  id: string;
+  apartment_id: string;
+  date: string;
+  beds24_booking_id: string | null;
+  reason: string | null;
+};
+
 type Beds24Record = Beds24Booking & Record<string, unknown>;
 
 export type Beds24SyncSummary = {
@@ -63,6 +71,12 @@ export function validDate(s: string | null | undefined) {
 
 function nightsBetween(checkin: string, checkout: string) {
   return Math.round((Date.parse(checkout) - Date.parse(checkin)) / DAY);
+}
+
+function datesBetween(checkin: string, checkout: string) {
+  const dates: string[] = [];
+  for (let d = checkin; d < checkout; d = addDays(d, 1)) dates.push(d);
+  return dates;
 }
 
 function str(v: unknown) {
@@ -188,6 +202,121 @@ async function fetchRows(opts: { from?: string; to?: string; bookingIds?: string
   return Array.isArray(response.data) ? (response.data as Beds24Record[]) : [];
 }
 
+async function syncManualBlock(
+  sb: ReturnType<typeof createAdminClient>,
+  b24Id: string,
+  apt: ApartmentRow,
+  checkin: string,
+  checkout: string,
+  status: string,
+) {
+  const { data: byBeds24Id, error: byIdErr } = await sb
+    .from("availability_blocks")
+    .select("id,apartment_id,date,beds24_booking_id,reason")
+    .eq("beds24_booking_id", b24Id);
+
+  if (byIdErr) {
+    await logSync(sb, { beds24Id: b24Id, apartmentId: apt.id, action: "block_lookup", ok: false, detail: JSON.stringify(byIdErr) });
+    return { imported: 0, updated: 0, unchanged: 0, skipped: 0, errors: 1 };
+  }
+
+  const existingById = ((byBeds24Id || []) as ExistingBlock[]).filter((row) => row.apartment_id === apt.id);
+  if (status !== "active") {
+    if (!existingById.length) return { imported: 0, updated: 0, unchanged: 0, skipped: 1, errors: 0 };
+    const { error } = await sb.from("availability_blocks").delete().in("id", existingById.map((row) => row.id));
+    if (error) {
+      await logSync(sb, { beds24Id: b24Id, apartmentId: apt.id, action: "block_delete", ok: false, detail: JSON.stringify(error) });
+      return { imported: 0, updated: 0, unchanged: 0, skipped: 0, errors: 1 };
+    }
+    await logSync(sb, { beds24Id: b24Id, apartmentId: apt.id, action: "block_delete", ok: true, detail: JSON.stringify({ status }) });
+    return { imported: 0, updated: existingById.length, unchanged: 0, skipped: 0, errors: 0 };
+  }
+
+  const wantedDates = new Set(datesBetween(checkin, checkout));
+  let imported = 0;
+  let updated = 0;
+  let unchanged = 0;
+  let skipped = 0;
+  let errors = 0;
+
+  const stale = existingById.filter((row) => !wantedDates.has(row.date));
+  if (stale.length) {
+    const { error } = await sb.from("availability_blocks").delete().in("id", stale.map((row) => row.id));
+    if (error) {
+      errors++;
+      await logSync(sb, { beds24Id: b24Id, apartmentId: apt.id, action: "block_prune", ok: false, detail: JSON.stringify(error) });
+    } else {
+      updated += stale.length;
+      await logSync(sb, { beds24Id: b24Id, apartmentId: apt.id, action: "block_prune", ok: true, detail: JSON.stringify(stale.map((row) => row.date)) });
+    }
+  }
+
+  const existingDateSet = new Set(existingById.filter((row) => wantedDates.has(row.date)).map((row) => row.date));
+  for (const date of wantedDates) {
+    if (existingDateSet.has(date)) {
+      unchanged++;
+      continue;
+    }
+
+    const { data: sameDate, error: sameDateErr } = await sb
+      .from("availability_blocks")
+      .select("id,apartment_id,date,beds24_booking_id,reason")
+      .eq("apartment_id", apt.id)
+      .eq("date", date)
+      .maybeSingle();
+
+    if (sameDateErr) {
+      errors++;
+      await logSync(sb, { beds24Id: b24Id, apartmentId: apt.id, action: "block_date_lookup", ok: false, detail: JSON.stringify(sameDateErr) });
+      continue;
+    }
+
+    const block = sameDate as ExistingBlock | null;
+    if (block) {
+      if (block.beds24_booking_id && block.beds24_booking_id !== b24Id) {
+        skipped++;
+        await logSync(sb, {
+          beds24Id: b24Id,
+          apartmentId: apt.id,
+          action: "block_conflict",
+          ok: false,
+          detail: JSON.stringify({ date, existingBeds24Id: block.beds24_booking_id }),
+        });
+        continue;
+      }
+
+      const { error } = await sb
+        .from("availability_blocks")
+        .update({ beds24_booking_id: b24Id, reason: block.reason || "Beds24 block" })
+        .eq("id", block.id);
+      if (error) {
+        errors++;
+        await logSync(sb, { beds24Id: b24Id, apartmentId: apt.id, action: "block_attach", ok: false, detail: JSON.stringify(error) });
+      } else {
+        updated++;
+        await logSync(sb, { beds24Id: b24Id, apartmentId: apt.id, action: "block_attach", ok: true, detail: JSON.stringify({ date }) });
+      }
+      continue;
+    }
+
+    const { error } = await sb.from("availability_blocks").insert({
+      apartment_id: apt.id,
+      date,
+      reason: "Beds24 block",
+      beds24_booking_id: b24Id,
+    });
+    if (error) {
+      errors++;
+      await logSync(sb, { beds24Id: b24Id, apartmentId: apt.id, action: "block_insert", ok: false, detail: JSON.stringify(error) });
+    } else {
+      imported++;
+      await logSync(sb, { beds24Id: b24Id, apartmentId: apt.id, action: "block_insert", ok: true, detail: JSON.stringify({ date }) });
+    }
+  }
+
+  return { imported, updated, unchanged, skipped, errors };
+}
+
 export async function syncBeds24Bookings(opts: { from?: string; to?: string; bookingIds?: string[] } = {}): Promise<Beds24SyncSummary> {
   if (!beds24Enabled()) return { enabled: false };
 
@@ -220,11 +349,6 @@ export async function syncBeds24Bookings(opts: { from?: string; to?: string; boo
   let errors = 0;
 
   for (const b of rows) {
-    if (isManualBlock(b)) {
-      skipped++;
-      continue;
-    }
-
     const b24Id = beds24Id(b);
     const bRoomId = roomId(b);
     const apt = bRoomId ? roomToApartment.get(bRoomId) : null;
@@ -233,6 +357,16 @@ export async function syncBeds24Bookings(opts: { from?: string; to?: string; boo
 
     if (!b24Id || !apt || !validDate(checkin) || !validDate(checkout) || checkin! >= checkout!) {
       skipped++;
+      continue;
+    }
+
+    if (isManualBlock(b)) {
+      const block = await syncManualBlock(sb, b24Id, apt, checkin!, checkout!, statusOf(b));
+      imported += block.imported;
+      updated += block.updated;
+      unchanged += block.unchanged;
+      skipped += block.skipped;
+      errors += block.errors;
       continue;
     }
 
