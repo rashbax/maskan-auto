@@ -10,7 +10,8 @@
 // real token before relying on them in production.
 
 const BASE = process.env.BEDS24_API_BASE || "https://api.beds24.com/v2";
-const REFRESH = process.env.BEDS24_REFRESH_TOKEN;
+// trim — a stray newline/space in the env var would otherwise corrupt the refreshToken header
+const REFRESH = process.env.BEDS24_REFRESH_TOKEN?.trim();
 
 export const beds24Enabled = () => !!REFRESH;
 
