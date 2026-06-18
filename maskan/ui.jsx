@@ -239,6 +239,3 @@ export function GoogleG({ size = 18 }) {
   );
 }
 
-// UZS price formatter (from USD). e.g. 126 -> "UZS 1 593 900"
-const USD_TO_UZS = 12650;
-export function uzs(usd) { return "UZS " + Math.round(usd * USD_TO_UZS).toLocaleString("ru-RU").replace(/ /g, " ").replace(/,/g, " "); }

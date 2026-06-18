@@ -5,7 +5,7 @@ import { useState } from "react";
 import { MASKAN } from "@/maskan/data";
 import {
   Icon, Logo, Button, Chip, Badge, Stars, Stepper, Photo, Sk,
-  ChannelBtn, GoogleG, uzs,
+  ChannelBtn, GoogleG,
 } from "@/maskan/ui";
 
 const lang = "uz";
@@ -190,7 +190,7 @@ export default function DesignSystem() {
           </div>
         </Block>
 
-        <div className="pt-10 text-center text-[12px] text-inksoft">© 2026 Maskan · Design System · {uzs(1)} ≈ 1 USD</div>
+        <div className="pt-10 text-center text-[12px] text-inksoft">© 2026 Maskan · Design System</div>
       </div>
     </div>
   );
