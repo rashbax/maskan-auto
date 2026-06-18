@@ -166,10 +166,14 @@ export async function removeFavorite(apartmentId) {
   await sb.from("favorites").delete().eq("user_id", user.id).eq("apartment_id", apartmentId);
 }
 
-// ---------- this user's bookings (RLS = own rows) ----------
+// ---------- this user's bookings (own rows only) ----------
 export async function getMyBookings() {
   const sb = createClient();
-  const { data, error } = await sb.from("bookings").select("*").order("checkin", { ascending: false });
+  const { data: { user } } = await sb.auth.getUser();
+  if (!user) return [];
+  // filter by user_id explicitly — an admin's RLS can read every row, so relying on RLS alone would
+  // surface ALL bookings (incl. OTA/manual) on this personal "my bookings" page
+  const { data, error } = await sb.from("bookings").select("*").eq("user_id", user.id).order("checkin", { ascending: false });
   if (error) return [];
   return (data || []).map((b) => ({
     id: b.id,
