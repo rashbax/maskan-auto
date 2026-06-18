@@ -2,14 +2,15 @@
 import { useState, useEffect, useRef, createRef } from "react";
 import { MASKAN } from "./data";
 import { Icon, Logo, Button, Chip, Badge, Photo, Stepper, AMENITY_ICON, GoogleG, Sheet } from "./ui";
-import { calMonths, calWD, buildMonth, dOnly } from "./calendar";
+import { calMonths } from "./calendar";
 import { fmtRange } from "./catalog";
 import { StarRow } from "./reviews";
-import { getApartments, getAllBookings, cancelBooking, deleteBooking, shortenBooking, createManualBooking, getBlocks, blockDay, unblockDay, getAllReviews, setReviewHidden, setReviewReply, saveApartment, deleteApartment, requestUploadUrl, addPhoto, getPhotos, deletePhoto, setPhotoOrder } from "./db";
+import { getApartments, getAllBookings, cancelBooking, deleteBooking, shortenBooking, createManualBooking, getAllReviews, setReviewHidden, setReviewReply, saveApartment, deleteApartment, requestUploadUrl, addPhoto, getPhotos, deletePhoto, setPhotoOrder } from "./db";
 import { MapPicker } from "./maps";
 import { TelegramLoginButton } from "./telegram-button";
 import { PropertyFilesSection } from "./property-file";
 import { SuppliersSection } from "./suppliers";
+import { CalManager } from "./admin-calendar";
 
 const SRC = {
   website: { color: "#1B5E40", bg: "#EAF1EC", key: "src_website" },
@@ -533,90 +534,6 @@ function EditApt({ lang, STR, id, onBack, apartments, onSaved }) {
   );
 }
 
-// ---- calendar manager ----
-function CalManager({ lang, STR, apartments, bookings }) {
-  const M = MASKAN;
-  const apts = apartments || [];
-  const [aptId, setAptId] = useState(apts[0]?.id || "a1");
-  useEffect(() => { if (apts.length && !apts.find((a) => a.id === aptId)) setAptId(apts[0].id); }, [apts]);
-  const apt = apts.find((a) => a.id === aptId);
-  const T = (ru, uz, en) => (lang === "ru" ? ru : lang === "uz" ? uz : en);
-  const [view, setView] = useState({ y: M.TODAY.getFullYear(), m: M.TODAY.getMonth() });
-  const [blocked, setBlocked] = useState(new Set()); // saved (DB) state
-  const [draft, setDraft] = useState(new Set());     // working selection — sent only on Save
-  const [saving, setSaving] = useState(false);
-  useEffect(() => { getBlocks(aptId).then((s) => { setBlocked(s); setDraft(new Set(s)); }); }, [aptId]);
-  // booking-source map for this apt
-  const srcMap = {};
-  (bookings || []).filter((b) => b.apt === aptId && b.status === "active").forEach((b) => {
-    for (let x = new Date(b.from); x < new Date(b.to); x = M.addDays(x, 1)) srcMap[M.iso(x)] = b.source;
-  });
-  const cells = buildMonth(view.y, view.m);
-  const today = dOnly(M.TODAY);
-  // a click only toggles the local draft; nothing is sent until Save
-  function toggle(d) {
-    const k = M.iso(d);
-    setDraft((prev) => { const next = new Set(prev); if (next.has(k)) next.delete(k); else next.add(k); return next; });
-  }
-  const toBlock = [...draft].filter((k) => !blocked.has(k));
-  const toUnblock = [...blocked].filter((k) => !draft.has(k));
-  const dirty = toBlock.length > 0 || toUnblock.length > 0;
-  async function save() {
-    setSaving(true);
-    const failed = new Set();
-    let booked = false;
-    for (const k of toBlock) { try { await blockDay(aptId, k); } catch (e) { failed.add(k); if (e?.code === "23B01") booked = true; } }
-    for (const k of toUnblock) { try { await unblockDay(aptId, k); } catch { failed.add(k); } }
-    const saved = new Set(blocked);
-    for (const k of toBlock) if (!failed.has(k)) saved.add(k);
-    for (const k of toUnblock) if (!failed.has(k)) saved.delete(k);
-    setBlocked(saved); setDraft(new Set(saved)); setSaving(false);
-    if (failed.size) alert(booked
-      ? T("Некоторые даты уже забронированы — их нельзя закрыть.", "Ba'zi sanalar band — ularni yopib boʻlmaydi.", "Some dates already have a booking — can't block them.")
-      : T("Часть изменений не сохранилась. Повторите.", "Ba'zi oʻzgarishlar saqlanmadi. Qayta urining.", "Some changes didn't save. Try again."));
-  }
-  function shift(delta) { let m = view.m + delta, y = view.y; if (m < 0) { m = 11; y--; } if (m > 11) { m = 0; y++; } setView({ y, m }); }
-  if (!apt) return null;
-  return (
-    <div className="max-w-xl">
-      <div className="flex gap-2 overflow-x-auto no-scrollbar mb-5">
-        {apts.map((a) => <Chip key={a.id} active={a.id === aptId} onClick={() => setAptId(a.id)}>{a.title[lang].split(",")[0].split(" ").slice(0, 3).join(" ")}</Chip>)}
-      </div>
-      <div className="rounded-2xl border border-line bg-white p-5">
-        <div className="flex items-center justify-between mb-4">
-          <button onClick={() => shift(-1)} className="w-9 h-9 grid place-items-center rounded-full hover:bg-black/5"><Icon name="chevL" size={18} /></button>
-          <div className="font-serif text-[18px]">{calMonths[lang][view.m]} {view.y}</div>
-          <button onClick={() => shift(1)} className="w-9 h-9 grid place-items-center rounded-full hover:bg-black/5"><Icon name="chevR" size={18} /></button>
-        </div>
-        <div className="grid grid-cols-7 mb-1">{calWD[lang].map((w, i) => <div key={i} className="text-center text-[11px] font-bold text-inksoft py-1">{w}</div>)}</div>
-        <div className="grid grid-cols-7 gap-1">
-          {cells.map((d, i) => {
-            if (!d) return <div key={i} />;
-            const k = M.iso(d); const past = d < today; const src = srcMap[k]; const isBlocked = draft.has(k); const pending = isBlocked !== blocked.has(k);
-            const booked = !!src;
-            return (
-              <button key={i} disabled={past || booked} onClick={() => toggle(d)}
-                className={`aspect-square rounded-lg grid place-items-center text-[13.5px] font-semibold tnum relative transition ${past ? "text-inksoft/25" : booked ? "text-cream" : isBlocked ? "bg-inksoft/15 text-inksoft line-through" : "hover:bg-green-50 text-ink"} ${pending ? "ring-2 ring-green-600/70" : ""}`}
-                style={booked ? { background: SRC[src].color } : {}}>{d.getDate()}</button>
-            );
-          })}
-        </div>
-        <div className="flex flex-wrap gap-x-4 gap-y-1.5 mt-4 pt-4 border-t border-line text-[12px] font-semibold">
-          {Object.keys(SRC).map((s) => <span key={s} className="inline-flex items-center gap-1.5"><span className="w-3 h-3 rounded" style={{ background: SRC[s].color }} />{STR[lang][SRC[s].key]}</span>)}
-          <span className="inline-flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-inksoft/20" />{STR[lang].a_blocked}</span>
-        </div>
-        <p className="text-[12.5px] text-inksoft mt-3">{T("Выберите дни (закрыть/открыть), затем нажмите «Сохранить».", "Kunlarni tanlang (yopish/ochish), soʻng «Saqlash»ni bosing.", "Pick days to close/open, then press Save.")}</p>
-        {dirty && (
-          <div className="flex items-center gap-2 mt-4 pt-4 border-t border-line">
-            <Button icon="check" onClick={save} disabled={saving} className={saving ? "opacity-60 pointer-events-none" : ""}>{saving ? "…" : `${T("Сохранить", "Saqlash", "Save")} (${toBlock.length + toUnblock.length})`}</Button>
-            <button onClick={() => setDraft(new Set(blocked))} disabled={saving} className="text-[13px] font-semibold text-inksoft hover:text-ink px-3 h-9 rounded-full hover:bg-black/5">{T("Отмена", "Bekor", "Cancel")}</button>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
 // ---- 404 (what non-admins see) ----
 function Admin404({ lang, STR, onBack }) {
   return (
@@ -890,6 +807,10 @@ export function Admin({ lang, STR, device, onExit, openLang, role, auth, onLogin
     window.history.pushState({ screen: "admin", editId: id }, "", tab === "dash" ? "#admin/list" : "#admin/" + tab);
   };
 
+  // Drive the layout off the device prop (NOT CSS md: breakpoints) so it stays correct
+  // inside a phone device frame, where the real viewport is wider than the rendered shell.
+  const desktop = device === "desktop";
+
   const nav = [
     { k: "dash", label: STR[lang].a_dashboard, icon: "grid" },
     { k: "list", label: STR[lang].a_listings, icon: "home" },
@@ -903,35 +824,39 @@ export function Admin({ lang, STR, device, onExit, openLang, role, auth, onLogin
 
   return (
     <div className="min-h-screen bg-canvas flex relative">
-      {/* sidebar (desktop) */}
-      <aside className="hidden md:flex w-60 shrink-0 flex-col border-r border-line bg-white px-4 py-5">
-        <div className="px-2 mb-7"><Logo size={30} /></div>
-        <nav className="space-y-1 flex-1">
-          {nav.map((n) => (
-            <button key={n.k} onClick={() => goTab(n.k)}
-              className={`w-full flex items-center gap-3 h-11 px-3 rounded-xl text-[14px] font-semibold transition ${tab === n.k ? "bg-green-50 text-green-700" : "text-inksoft hover:bg-black/[.03]"}`}>
-              <Icon name={n.icon} size={19} />{n.label}</button>
-          ))}
-        </nav>
-        <button onClick={onExit} className="flex items-center gap-3 h-11 px-3 rounded-xl text-[14px] font-semibold text-inksoft hover:bg-black/[.03]"><Icon name="logout" size={18} />{STR[lang].catalog}</button>
-      </aside>
+      {/* sidebar (desktop only — driven by the device prop, not md:) */}
+      {desktop && (
+        <aside className="flex w-60 shrink-0 flex-col border-r border-line bg-white px-4 py-5">
+          <div className="px-2 mb-7"><Logo size={30} /></div>
+          <nav className="space-y-1 flex-1">
+            {nav.map((n) => (
+              <button key={n.k} onClick={() => goTab(n.k)}
+                className={`w-full flex items-center gap-3 h-11 px-3 rounded-xl text-[14px] font-semibold transition ${tab === n.k ? "bg-green-50 text-green-700" : "text-inksoft hover:bg-black/[.03]"}`}>
+                <Icon name={n.icon} size={19} />{n.label}</button>
+            ))}
+          </nav>
+          <button onClick={onExit} className="flex items-center gap-3 h-11 px-3 rounded-xl text-[14px] font-semibold text-inksoft hover:bg-black/[.03]"><Icon name="logout" size={18} />{STR[lang].catalog}</button>
+        </aside>
+      )}
 
       <div className="flex-1 min-w-0 flex flex-col">
-        <header className="sticky top-0 z-20 bg-canvas/92 backdrop-blur border-b border-line px-5 md:px-8">
+        <header className={`sticky top-0 z-20 bg-canvas/92 backdrop-blur border-b border-line ${desktop ? "px-8" : "px-5"}`}>
           <div className="flex items-center justify-between h-16">
             <h1 className="font-serif text-[22px]">{editId ? STR[lang].a_edit : titles[tab]}</h1>
             <button onClick={openLang} className="inline-flex items-center gap-1.5 h-9 px-3 rounded-full border border-line text-[13px] font-bold"><Icon name="globe" size={15} />{STR[lang].code}</button>
           </div>
-          {/* mobile tabs */}
-          <div className="md:hidden flex gap-2 overflow-x-auto no-scrollbar pb-2.5 -mt-1">
-            {nav.map((n) => <Chip key={n.k} active={tab === n.k} icon={n.icon} onClick={() => goTab(n.k)}>{n.label}</Chip>)}
-          </div>
+          {/* mobile tabs (when not desktop) */}
+          {!desktop && (
+            <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2.5 -mt-1">
+              {nav.map((n) => <Chip key={n.k} active={tab === n.k} icon={n.icon} onClick={() => goTab(n.k)}>{n.label}</Chip>)}
+            </div>
+          )}
         </header>
-        <main className="flex-1 px-5 md:px-8 py-6 overflow-y-auto no-scrollbar">
+        <main className={`flex-1 ${desktop ? "px-8" : "px-5"} py-6 overflow-y-auto no-scrollbar`}>
           {editId ? <EditApt lang={lang} STR={STR} id={editId} onBack={() => window.history.back()} apartments={apts} onSaved={() => getApartments().then(setApts)} />
             : tab === "dash" ? <Dashboard lang={lang} STR={STR} bookings={bookings} apartments={apts} />
             : tab === "list" ? <Listings lang={lang} STR={STR} onEdit={goEdit} apartments={apts} />
-            : tab === "cal" ? <CalManager lang={lang} STR={STR} apartments={apts} bookings={bookings} />
+            : tab === "cal" ? <CalManager lang={lang} STR={STR} apartments={apts} bookings={bookings} device={device} />
             : tab === "reviews" ? <ReviewsModeration lang={lang} STR={STR} apartments={apts} />
             : tab === "pfile" ? <PropertyFilesSection lang={lang} STR={STR} apartments={apts} />
             : tab === "suppliers" ? <SuppliersSection lang={lang} STR={STR} />

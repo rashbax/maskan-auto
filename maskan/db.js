@@ -275,6 +275,15 @@ export async function getBlocks(apartmentId) {
   if (error) return new Set();
   return new Set((data || []).map((r) => r.date));
 }
+// all apartments at once → { [apartmentId]: Set<isoDate> } (one query, for the calendar manager)
+export async function getAllBlocks() {
+  const sb = createClient();
+  const { data, error } = await sb.from("availability_blocks").select("apartment_id,date");
+  if (error) return {};
+  const map = {};
+  (data || []).forEach((r) => { (map[r.apartment_id] ||= new Set()).add(r.date); });
+  return map;
+}
 
 async function blockApi(method, apartmentId, date) {
   const res = await fetch("/api/availability-blocks", {
