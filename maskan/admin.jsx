@@ -127,7 +127,7 @@ function BookingRow({ b, lang, STR, onCancel, onDelete, onShorten, apartments })
       <div className="w-11 h-11 rounded-lg overflow-hidden shrink-0"><Photo tone={apt.tone} idx={0} eager showLabel={false} className="w-full h-full" /></div>
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2"><span className="font-bold text-[14px] truncate">{b.guest}</span><SourceTag src={b.source} lang={lang} STR={STR} /></div>
-        <div className="text-[12.5px] text-inksoft truncate">{apt.title[lang]} · {fmtRange(new Date(b.from), new Date(b.to), lang)}</div>
+        <div className="text-[12.5px] text-inksoft truncate">{apt.title[lang]} <span className="font-mono text-inksoft/65 select-all">#{b.apt}</span> · {fmtRange(new Date(b.from), new Date(b.to), lang)}</div>
       </div>
       <div className="text-right shrink-0 hidden sm:block"><div className="font-bold text-[15px] tnum">${b.total}</div><div className="text-[11px] text-inksoft tnum">{b.phone}</div></div>
       {onShorten && b.status === "active" && b.nights > 1 && b.source !== "booking" && <button onClick={() => onShorten(b)} title={lang === "ru" ? "Ранний выезд" : lang === "uz" ? "Erta chiqish" : "Early checkout"} className="shrink-0 w-8 h-8 grid place-items-center rounded-full text-inksoft hover:text-green-700 hover:bg-green-50"><Icon name="clock" size={15} /></button>}

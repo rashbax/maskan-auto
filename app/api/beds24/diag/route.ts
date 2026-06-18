@@ -1,19 +1,10 @@
 import { NextResponse } from "next/server";
 import { timingSafeEqual } from "crypto";
-import { beds24Enabled, validateToken, setupFromInviteCode, getProperties, getBookings } from "@/lib/beds24";
+import { beds24Enabled, validateToken, setupFromInviteCode, getProperties } from "@/lib/beds24";
 
 export const runtime = "nodejs";
 
 const KEY = process.env.BEDS24_DIAG_KEY?.trim();
-const BEDS24_STATUSES = ["confirmed", "request", "new", "cancelled", "black", "inquiry"];
-
-// never echo payment/credential fields, even through a key-gated diagnostic
-const SECRET_KEY = /(token|card|cvc|cvv|stripe|pcibooking|password|secret)/i;
-function redact(row: Record<string, unknown>) {
-  const out: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(row)) out[k] = SECRET_KEY.test(k) ? "[redacted]" : v;
-  return out;
-}
 
 const json = (body: unknown, status = 200) =>
   NextResponse.json(body, { status, headers: { "Cache-Control": "no-store" } });
@@ -34,11 +25,6 @@ function authorized(req: Request, url: URL) {
   return keyOk(req.headers.get("x-beds24-diag-key")) || keyOk(bearer) || keyOk(url.searchParams.get("key"));
 }
 
-function bookingId(url: URL) {
-  const id = url.searchParams.get("booking") || url.searchParams.get("bookingId") || url.searchParams.get("id");
-  return id && /^\d+$/.test(id) ? id : null;
-}
-
 // Read-only checks — no long-lived secret in the response, so a query key is acceptable here.
 //   GET /api/beds24/diag?key=...          -> { enabled, validToken }
 //   GET /api/beds24/diag?key=...&props=1  -> properties + rooms (read off propertyId / roomId)
@@ -49,22 +35,6 @@ export async function GET(req: Request) {
 
   if (!beds24Enabled()) return json({ enabled: false });
   try {
-    const id = bookingId(url);
-    if (id) {
-      // forward any include* query param (e.g. includeGuests, includeInfoItems, includeInvoiceItems)
-      // so we can probe which Beds24 option surfaces guest name/email/phone
-      const params: Record<string, string | string[]> = { id, status: BEDS24_STATUSES };
-      for (const [k, v] of url.searchParams) if (k.startsWith("include")) params[k] = v;
-      const response = await getBookings(params);
-      const rows = Array.isArray(response.data) ? response.data : [];
-      return json({
-        enabled: true,
-        bookingId: id,
-        count: rows.length,
-        fields: rows.map((row) => Object.keys(row).sort()),
-        data: rows.map((row) => redact(row as unknown as Record<string, unknown>)),
-      });
-    }
     if (url.searchParams.get("props")) return json(await getProperties());
     const v = await validateToken();
     return json({ enabled: true, validToken: v.validToken });
