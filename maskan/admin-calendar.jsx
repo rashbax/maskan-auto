@@ -135,6 +135,12 @@ function Calendar({ lang, STR, apt, bookings, view, setView, draft, setDraft, co
     dragRef.current = { mode: draftRef.current.has(k) ? "open" : "block", touched: new Set() };
     addToDrag(k);
   }
+  // mobile: tap toggles one day. Fires via onClick, which the browser suppresses after a
+  // scroll swipe — so the page stays scrollable and a scroll never toggles a day.
+  function toggleOne(k) {
+    if (!editable(k)) return;
+    setDraft((prev) => { const next = new Set(prev); if (next.has(k)) next.delete(k); else next.add(k); return next; });
+  }
   function onGridMove(e) {
     if (!dragRef.current) return;
     const el = document.elementFromPoint(e.clientX, e.clientY);
@@ -180,8 +186,9 @@ function Calendar({ lang, STR, apt, bookings, view, setView, draft, setDraft, co
       {/* weekday header */}
       <div className="grid grid-cols-7 mb-1">{calWD[lang].map((w, i) => <div key={i} className="text-center text-[11px] font-bold text-inksoft py-1">{w}</div>)}</div>
 
-      {/* day grid */}
-      <div onPointerMove={onGridMove} className="grid grid-cols-7 gap-1 select-none" style={{ touchAction: "none" }}>
+      {/* day grid — desktop: pointer-drag (touch-action none). mobile: tap-to-toggle, so the
+          page stays scrollable (touch-action manipulation = pan/scroll, snappy taps). */}
+      <div onPointerMove={desktop ? onGridMove : undefined} className="grid grid-cols-7 gap-1 select-none" style={{ touchAction: desktop ? "none" : "manipulation" }}>
         {cells.map((d, i) => {
           if (!d) return <div key={i} />;
           const k = M.iso(d);
@@ -201,8 +208,11 @@ function Calendar({ lang, STR, apt, bookings, view, setView, draft, setDraft, co
               <button
                 data-day={!past && !booked ? k : undefined}
                 disabled={past}
-                onPointerDown={(e) => { if (!booked) onCellDown(k, e); }}
-                onClick={() => { if (booked) setPop((p) => (p === k ? null : k)); }}
+                onPointerDown={desktop && !booked ? (e) => onCellDown(k, e) : undefined}
+                onClick={() => {
+                  if (booked) { setPop((p) => (p === k ? null : k)); return; }
+                  if (!desktop) toggleOne(k); // mobile: tap toggles (desktop uses pointer-drag)
+                }}
                 onMouseEnter={() => { if (booked && desktop) setPop(k); }}
                 onMouseLeave={() => { if (booked && desktop) setPop((p) => (p === k ? null : p)); }}
                 className={`w-full h-full rounded-lg grid place-items-center text-[13.5px] font-semibold tnum transition-colors ${cls}`}
