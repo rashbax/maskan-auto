@@ -43,7 +43,11 @@ export async function GET(req: Request) {
   try {
     const id = bookingId(url);
     if (id) {
-      const response = await getBookings({ id, status: BEDS24_STATUSES });
+      // forward any include* query param (e.g. includeGuests, includeInfoItems, includeInvoiceItems)
+      // so we can probe which Beds24 option surfaces guest name/email/phone
+      const params: Record<string, string | string[]> = { id, status: BEDS24_STATUSES };
+      for (const [k, v] of url.searchParams) if (k.startsWith("include")) params[k] = v;
+      const response = await getBookings(params);
       const rows = Array.isArray(response.data) ? response.data : [];
       return json({
         enabled: true,
