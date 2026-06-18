@@ -17,6 +17,10 @@ type ExistingBooking = {
   apartment_id: string;
   guest_name: string | null;
   phone: string | null;
+  email: string | null;
+  adults: number | null;
+  children: number | null;
+  ota_reference: string | null;
   checkin: string;
   checkout: string;
   nights: number | null;
@@ -163,6 +167,22 @@ function phone(b: Beds24Record) {
 
 function totalUsd(b: Beds24Record) {
   return num(b.price) ?? num(b.total) ?? num(b.totalPrice) ?? num(b.amount);
+}
+
+function email(b: Beds24Record) {
+  return pickString(b, ["email", "guestEmail"]) || pickNestedString(b, [["guest", "email"]]);
+}
+
+function otaReference(b: Beds24Record) {
+  return pickString(b, ["apiReference", "reference", "bookingReference"]);
+}
+
+function partyAdults(b: Beds24Record) {
+  return num(b.numAdult) ?? num(b.numAdults) ?? num(b.adults);
+}
+
+function partyChildren(b: Beds24Record) {
+  return num(b.numChild) ?? num(b.numChildren) ?? num(b.children);
 }
 
 function changed(existing: ExistingBooking, next: Partial<ExistingBooking>, keys: (keyof ExistingBooking)[]) {
@@ -384,10 +404,19 @@ export async function syncBeds24Bookings(opts: { from?: string; to?: string; boo
       total_usd,
       status,
     };
+    // OTA-origin guest/contact/party fields (now available with the bookings-personal token scope)
+    const otaFields = {
+      guest_name: guestName(b),
+      phone: phone(b),
+      email: email(b),
+      adults: partyAdults(b),
+      children: partyChildren(b),
+      ota_reference: otaReference(b),
+    };
 
     const { data: existing, error: existingErr } = await sb
       .from("bookings")
-      .select("id,apartment_id,guest_name,phone,checkin,checkout,nights,total_usd,source,status,beds24_booking_id")
+      .select("id,apartment_id,guest_name,phone,email,adults,children,ota_reference,checkin,checkout,nights,total_usd,source,status,beds24_booking_id")
       .eq("beds24_booking_id", b24Id)
       .maybeSingle();
 
@@ -399,7 +428,7 @@ export async function syncBeds24Bookings(opts: { from?: string; to?: string; boo
 
     if (existing) {
       const e = existing as ExistingBooking;
-      const guestFields = e.source === "website" ? {} : { guest_name: guestName(b), phone: phone(b) };
+      const guestFields = e.source === "website" ? {} : otaFields;
       const next = { ...base, ...guestFields };
       const keys = Object.keys(next) as (keyof ExistingBooking)[];
       if (!changed(e, next, keys)) {
@@ -428,8 +457,7 @@ export async function syncBeds24Bookings(opts: { from?: string; to?: string; boo
       ...base,
       beds24_booking_id: b24Id,
       source: "booking",
-      guest_name: guestName(b),
-      phone: phone(b),
+      ...otaFields,
     });
     if (error) {
       errors++;

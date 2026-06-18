@@ -7,6 +7,14 @@ export const runtime = "nodejs";
 const KEY = process.env.BEDS24_DIAG_KEY?.trim();
 const BEDS24_STATUSES = ["confirmed", "request", "new", "cancelled", "black", "inquiry"];
 
+// never echo payment/credential fields, even through a key-gated diagnostic
+const SECRET_KEY = /(token|card|cvc|cvv|stripe|pcibooking|password|secret)/i;
+function redact(row: Record<string, unknown>) {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(row)) out[k] = SECRET_KEY.test(k) ? "[redacted]" : v;
+  return out;
+}
+
 const json = (body: unknown, status = 200) =>
   NextResponse.json(body, { status, headers: { "Cache-Control": "no-store" } });
 
@@ -54,7 +62,7 @@ export async function GET(req: Request) {
         bookingId: id,
         count: rows.length,
         fields: rows.map((row) => Object.keys(row).sort()),
-        data: rows,
+        data: rows.map((row) => redact(row as unknown as Record<string, unknown>)),
       });
     }
     if (url.searchParams.get("props")) return json(await getProperties());
