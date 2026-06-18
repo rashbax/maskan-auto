@@ -5,7 +5,7 @@ import { Icon, Logo, Button, Chip, Badge, Photo, Stepper, AMENITY_ICON, GoogleG,
 import { calMonths } from "./calendar";
 import { fmtRange } from "./catalog";
 import { StarRow } from "./reviews";
-import { getApartments, getAllBookings, cancelBooking, deleteBooking, shortenBooking, createManualBooking, getAllReviews, setReviewHidden, setReviewReply, saveApartment, deleteApartment, requestUploadUrl, addPhoto, getPhotos, deletePhoto, setPhotoOrder } from "./db";
+import { getApartments, getAllBookings, cancelBooking, deleteBooking, shortenBooking, createManualBooking, getAllBlocks, getAllReviews, setReviewHidden, setReviewReply, saveApartment, deleteApartment, requestUploadUrl, addPhoto, getPhotos, deletePhoto, setPhotoOrder } from "./db";
 import { MapPicker } from "./maps";
 import { TelegramLoginButton } from "./telegram-button";
 import { PropertyFilesSection } from "./property-file";
@@ -50,6 +50,8 @@ function aptById(id) { return MASKAN.APARTMENTS.find((a) => a.id === id); }
 // ---- dashboard ----
 function Dashboard({ lang, STR, bookings, apartments }) {
   const M = MASKAN;
+  const [blocks, setBlocks] = useState({}); // { [apartmentId]: Set<isoDate> } — for the occupancy denominator
+  useEffect(() => { getAllBlocks().then(setBlocks); }, []);
   const today = M.iso(M.TODAY);
   const list = bookings || [];
   const todays = list.filter((b) => b.from === today);
@@ -73,7 +75,15 @@ function Dashboard({ lang, STR, bookings, apartments }) {
     const bNights = b.nights || Math.round((new Date(b.to) - new Date(b.from)) / 86400000) || 1;
     if (b.total) monthRevenue += (b.total / bNights) * nim;
   }
-  const totalNights = (apartments || []).length * daysInMonth;
+  // owner-blocked days aren't "available" inventory, so exclude them from the denominator
+  // (occupancy = sold nights / available nights, not / total capacity)
+  const mStartIso = M.iso(mStart), mEndIso = M.iso(mEnd);
+  let blockedNights = 0;
+  for (const a of apartments || []) {
+    const set = blocks[a.id];
+    if (set) for (const d of set) if (d >= mStartIso && d < mEndIso) blockedNights++;
+  }
+  const totalNights = Math.max(0, (apartments || []).length * daysInMonth - blockedNights);
   const occupancy = totalNights > 0 ? Math.round((bookedNights / totalNights) * 100) : 0;
   const revenue = Math.round(monthRevenue);
   return (
