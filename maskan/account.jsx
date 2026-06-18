@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { Icon, Logo, Button, Photo, GoogleG, uzs, tgHref } from "./ui";
+import { Icon, Logo, Button, Photo, GoogleG, tgHref } from "./ui";
 import { TelegramLoginButton } from "./telegram-button";
 import { AptCard, StateBlock, fmtRange } from "./catalog";
 
@@ -132,7 +132,7 @@ function BookingCard({ b, lang, STR, onOpen, onBookAgain, apartments }) {
           </div>
           <div className="flex items-center justify-between gap-2 mt-2">
             <StatusBadge status={b.status} lang={lang} STR={STR} />
-            <span className="font-bold text-[15px] tnum">{uzs(b.usd)}</span>
+            <span className="font-bold text-[15px] tnum">{b.usd != null ? `$${b.usd}` : "—"}</span>
           </div>
         </div>
       </div>
