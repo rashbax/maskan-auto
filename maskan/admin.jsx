@@ -333,9 +333,17 @@ function EditApt({ lang, STR, id, onBack, apartments, onSaved }) {
   const [nearI18n, setNearI18n] = useState(apt ? { uz: apt.near?.uz || "", ru: apt.near?.ru || "", en: apt.near?.en || "" } : { uz: "", ru: "", en: "" });
   const [editLang, setEditLang] = useState(lang);
   const [saving, setSaving] = useState(false);
-  const [aptId] = useState(apt?.id || ("apt-" + Date.now().toString(36)));
+  // New apartments get a human-friendly 6-digit numeric id (no letters), unique among
+  // the loaded list; the DB primary key is the final guard. Existing ones keep their id.
+  const [aptId] = useState(() => {
+    if (apt?.id) return apt.id;
+    const taken = new Set((apartments || []).map((a) => a.id));
+    let n; do { n = String(100000 + Math.floor(Math.random() * 900000)); } while (taken.has(n));
+    return n;
+  });
   const [photos, setPhotos] = useState([]);
   const fileRef = useRef(null);
+  const createdRef = useRef(false); // becomes true once the new apartment row is inserted
   useEffect(() => { if (apt?.id) getPhotos(apt.id).then(setPhotos); }, []);
   const [price, setPrice] = useState(apt ? apt.price : 35);
   const [amen, setAmen] = useState(apt ? apt.amenities : ["wifi", "ac", "kitchen"]);
@@ -364,7 +372,13 @@ function EditApt({ lang, STR, id, onBack, apartments, onSaved }) {
   function buildRow() {
     return { id: aptId, tone, price_usd: Number(price) || 0, district, sleeps: Number(guests) || 1, beds: Number(beds) || 0, living_rooms: Number(livingRooms) || 0, baths: Number(baths) || 1, size_m2: Number(size) || 0, lat, lng, check_in_time: checkIn || "14:00", check_out_time: checkOut || "12:00", beds24_room_id: beds24Room.trim() || null, beds24_prop_id: beds24Prop.trim() || null, host: apt?.host || "Maskan", title: titleI18n, blurb: blurbI18n, near: nearI18n, amenities: amen, photos_count: photos.length || count, status: "active" };
   }
-  async function persistApartment() { await saveApartment(buildRow(), address); }
+  async function persistApartment() {
+    // First write of a NEW apartment uses insert so a colliding 6-digit id errors
+    // instead of silently overwriting another apartment; later writes (and edits of an
+    // existing apartment) upsert.
+    await saveApartment(buildRow(), address, { create: !apt && !createdRef.current });
+    createdRef.current = true;
+  }
   async function save() {
     setSaving(true);
     try { await persistApartment(); if (onSaved) await onSaved(); onBack(); }

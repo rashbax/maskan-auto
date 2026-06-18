@@ -131,8 +131,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true });
     }
 
-    // (A) apartment enquiry deep-link: start=<aptId>_<lang> → greet the guest + hand off to host
-    if (payload.startsWith("apt-")) {
+    // (A) apartment enquiry deep-link: start=<aptId>_<lang> → greet the guest + hand off to host.
+    // Match by the trailing _<lang> so it works for numeric ids ("483920_uz") and legacy
+    // "apt-..." ids alike; login nonces are 32 hex chars with no _<lang> suffix, so they fall through.
+    if (/_(uz|ru|en)$/.test(payload)) {
       const us = payload.indexOf("_");
       const aptId = us === -1 ? payload : payload.slice(0, us);
       const lng = us === -1 ? "uz" : payload.slice(us + 1);

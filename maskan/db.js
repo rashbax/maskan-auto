@@ -348,9 +348,13 @@ export async function submitReview({ apartmentId, rating, cons, text, name, coun
 }
 
 // ---------- admin: create / update an apartment (text fields) ----------
-export async function saveApartment(row, address) {
+export async function saveApartment(row, address, opts = {}) {
   const sb = createClient();
-  const { error } = await sb.from("apartments").upsert(row);
+  // Brand-new apartment → insert (a colliding 6-digit id raises a unique violation instead
+  // of silently overwriting another row). Updates / "ensure the row exists" calls → upsert.
+  const { error } = opts.create
+    ? await sb.from("apartments").insert(row)
+    : await sb.from("apartments").upsert(row);
   if (error) throw error;
   if (address != null && address !== "") {
     await sb.from("apartment_private").upsert({ apartment_id: row.id, address });
