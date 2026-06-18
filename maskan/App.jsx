@@ -48,7 +48,7 @@ export default function App() {
   const router = useRouter();
   const [lang, setLang] = useState(() => {
     const saved = typeof window !== "undefined" ? localStorage.getItem("maskan_lang") : null;
-    return ["uz", "ru", "en"].includes(saved) ? saved : "uz";
+    return ["uz", "ru", "en"].includes(saved) ? saved : "ru"; // first visit defaults to Russian
   });
   const [device, setDevice] = useState(getDeviceMode);
   const [route, setRoute] = useState({ screen: "catalog" });

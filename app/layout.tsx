@@ -20,14 +20,14 @@ const spectral = Spectral({
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
-  title: "Maskan — Kunlik kvartiralar, Toshkent",
+  title: "Maskan — Квартиры посуточно в Ташкенте",
   description:
-    "Haqiqiy rasmlar, halol narx, lahzada band qilish. Toshkentda kunlik kvartiralar — qoʻngʻiroqlarsiz.",
+    "Реальные фото, честная цена, мгновенное бронирование. Посуточная аренда квартир в Ташкенте — без звонков.",
   openGraph: {
-    title: "Maskan — Kunlik kvartiralar, Toshkent",
-    description: "Haqiqiy rasmlar, halol narx, lahzada band qilish. Toshkentda kunlik kvartiralar.",
+    title: "Maskan — Квартиры посуточно в Ташкенте",
+    description: "Реальные фото, честная цена, мгновенное бронирование. Посуточная аренда квартир в Ташкенте.",
     type: "website",
-    locale: "uz_UZ",
+    locale: "ru_RU",
   },
 };
 
@@ -42,7 +42,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="uz" className={`${manrope.variable} ${spectral.variable} antialiased`}>
+    <html lang="ru" className={`${manrope.variable} ${spectral.variable} antialiased`}>
       <body className="font-sans text-ink antialiased">{children}</body>
     </html>
   );
