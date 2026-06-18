@@ -1,19 +1,34 @@
 import { NextResponse } from "next/server";
 import { timingSafeEqual } from "crypto";
-import { beds24Enabled, validateToken, setupFromInviteCode, getProperties } from "@/lib/beds24";
+import { beds24Enabled, validateToken, setupFromInviteCode, getProperties, getBookings } from "@/lib/beds24";
 
 export const runtime = "nodejs";
 
-const KEY = process.env.BEDS24_DIAG_KEY;
+const KEY = process.env.BEDS24_DIAG_KEY?.trim();
+const BEDS24_STATUSES = ["confirmed", "request", "new", "cancelled", "black", "inquiry"];
 
 const json = (body: unknown, status = 200) =>
   NextResponse.json(body, { status, headers: { "Cache-Control": "no-store" } });
 
 function keyOk(provided: string | null): boolean {
-  if (!KEY || !provided) return false;
-  const a = Buffer.from(provided);
+  // trim both sides — a stray newline/space pasted into the env var would otherwise fail the
+  // length check and reject an otherwise-correct key
+  const p = provided?.trim();
+  if (!KEY || !p) return false;
+  const a = Buffer.from(p);
   const b = Buffer.from(KEY);
   return a.length === b.length && timingSafeEqual(a, b);
+}
+
+function authorized(req: Request, url: URL) {
+  const auth = req.headers.get("authorization");
+  const bearer = auth?.startsWith("Bearer ") ? auth.slice("Bearer ".length) : null;
+  return keyOk(req.headers.get("x-beds24-diag-key")) || keyOk(bearer) || keyOk(url.searchParams.get("key"));
+}
+
+function bookingId(url: URL) {
+  const id = url.searchParams.get("booking") || url.searchParams.get("bookingId") || url.searchParams.get("id");
+  return id && /^\d+$/.test(id) ? id : null;
 }
 
 // Read-only checks — no long-lived secret in the response, so a query key is acceptable here.
@@ -22,10 +37,22 @@ function keyOk(provided: string | null): boolean {
 export async function GET(req: Request) {
   if (!KEY) return json({ error: "diag_disabled" }, 503);
   const url = new URL(req.url);
-  if (!keyOk(url.searchParams.get("key"))) return json({ error: "forbidden" }, 403);
+  if (!authorized(req, url)) return json({ error: "forbidden" }, 403);
 
   if (!beds24Enabled()) return json({ enabled: false });
   try {
+    const id = bookingId(url);
+    if (id) {
+      const response = await getBookings({ id, status: BEDS24_STATUSES });
+      const rows = Array.isArray(response.data) ? response.data : [];
+      return json({
+        enabled: true,
+        bookingId: id,
+        count: rows.length,
+        fields: rows.map((row) => Object.keys(row).sort()),
+        data: rows,
+      });
+    }
     if (url.searchParams.get("props")) return json(await getProperties());
     const v = await validateToken();
     return json({ enabled: true, validToken: v.validToken });
