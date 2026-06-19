@@ -199,10 +199,12 @@ function Calendar({ lang, STR, apt, bookings, view, setView, draft, setDraft, co
           const pending = isBlocked !== committed.has(k);
           const isToday = k === todayIso;
           const free = !past && !booked && !isBlocked;
+          // a day with a status fill ALWAYS gets light/cream text (readable). Past booked days get
+          // a dark inset overlay (below) instead of faint dark text that vanishes on the colour.
           let cls = "text-ink hover:bg-green-50";
-          if (past) cls = "text-inksoft/25";
-          else if (booked) cls = "text-cream cursor-default";
+          if (booked) cls = "text-cream cursor-default";
           else if (isBlocked) cls = "bg-inksoft/15 text-inksoft line-through";
+          else if (past) cls = "text-inksoft/25";
           return (
             <div key={i} className="relative aspect-square">
               <button
@@ -216,7 +218,7 @@ function Calendar({ lang, STR, apt, bookings, view, setView, draft, setDraft, co
                 onMouseEnter={() => { if (booked && desktop) setPop(k); }}
                 onMouseLeave={() => { if (booked && desktop) setPop((p) => (p === k ? null : p)); }}
                 className={`w-full h-full rounded-lg grid place-items-center text-[13.5px] font-semibold tnum transition-colors ${cls}`}
-                style={booked ? { background: SRC[booking.source]?.color } : {}}>
+                style={booked ? { background: SRC[booking.source]?.color, ...(past ? { boxShadow: "inset 0 0 0 999px rgba(26,26,23,.18)" } : {}) } : {}}>
                 {d.getDate()}
                 {free && <span className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-green-600" />}
               </button>
@@ -237,16 +239,19 @@ function Calendar({ lang, STR, apt, bookings, view, setView, draft, setDraft, co
       </div>
       <p className="text-[12.5px] text-inksoft mt-3">{STR[lang].cal_helper}</p>
 
-      {/* save / cancel bar */}
+      {/* floating save bar — fixed to the viewport so you never scroll to reach it */}
       {dirty && (
-        <div className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-green-600/30 bg-green-50 px-4 py-3">
-          <div className="text-[13px] min-w-0">
-            <span className="font-bold">{STR[lang].cal_unsaved}</span>
-            <span className="text-inksoft"> · <span className="tnum">{toBlock}</span> {STR[lang].cal_to_block} · <span className="tnum">{toOpen}</span> {STR[lang].cal_to_open}</span>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <Button size="sm" icon="check" onClick={onSave}>{STR[lang].a_save}</Button>
-            <Button size="sm" variant="ghost" onClick={onCancel}>{STR[lang].a_cancel}</Button>
+        <div className={`fixed z-40 ${desktop ? "bottom-6 left-1/2 -translate-x-1/2" : "inset-x-0 bottom-0"}`}>
+          <div className={`flex items-center gap-3 bg-white shadow-pop border-green-600/30 ${desktop ? "rounded-full border px-4 py-2.5" : "border-t px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] justify-between"}`}>
+            <div className="flex items-center gap-2 text-[13px] min-w-0">
+              <span className="w-2 h-2 rounded-full bg-green-600 animate-pulse shrink-0" />
+              <span className="font-bold whitespace-nowrap">{STR[lang].cal_unsaved}</span>
+              <span className="text-inksoft truncate">· <span className="tnum">{toBlock}</span> {STR[lang].cal_to_block} · <span className="tnum">{toOpen}</span> {STR[lang].cal_to_open}</span>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <Button size="sm" variant="ghost" onClick={onCancel}>{STR[lang].a_cancel}</Button>
+              <Button size="sm" icon="check" onClick={onSave}>{STR[lang].a_save}</Button>
+            </div>
           </div>
         </div>
       )}

@@ -48,7 +48,7 @@ function NumF({ label, value, set, min = 0, max = 999 }) {
 function aptById(id) { return MASKAN.APARTMENTS.find((a) => a.id === id); }
 
 // ---- dashboard ----
-function Dashboard({ lang, STR, bookings, apartments }) {
+function Dashboard({ lang, STR, bookings, apartments, onOpenDetail }) {
   const M = MASKAN;
   const [blocks, setBlocks] = useState({}); // { [apartmentId]: Set<isoDate> } — for the occupancy denominator
   useEffect(() => { getAllBlocks().then(setBlocks); }, []);
@@ -97,18 +97,18 @@ function Dashboard({ lang, STR, bookings, apartments }) {
       <div>
         <h3 className="font-serif text-[19px] mb-3">{STR[lang].a_today}</h3>
         {todays.length === 0 ? <div className="text-[14px] text-inksoft py-6 text-center border border-dashed border-line rounded-2xl">—</div> : (
-          <div className="space-y-2">{todays.map((b) => <BookingRow key={b.id} b={b} lang={lang} STR={STR} apartments={apartments} />)}</div>
+          <div className="space-y-2">{todays.map((b) => <BookingRow key={b.id} b={b} lang={lang} STR={STR} apartments={apartments} onOpen={onOpenDetail} />)}</div>
         )}
       </div>
       {staying.length > 0 && (
         <div>
           <h3 className="font-serif text-[19px] mb-3">{STR[lang].a_staying}</h3>
-          <div className="space-y-2">{staying.map((b) => <BookingRow key={b.id} b={b} lang={lang} STR={STR} apartments={apartments} />)}</div>
+          <div className="space-y-2">{staying.map((b) => <BookingRow key={b.id} b={b} lang={lang} STR={STR} apartments={apartments} onOpen={onOpenDetail} />)}</div>
         </div>
       )}
       <div>
         <h3 className="font-serif text-[19px] mb-3">{STR[lang].a_upcoming}</h3>
-        <div className="space-y-2">{upcoming.map((b) => <BookingRow key={b.id} b={b} lang={lang} STR={STR} apartments={apartments} />)}</div>
+        <div className="space-y-2">{upcoming.map((b) => <BookingRow key={b.id} b={b} lang={lang} STR={STR} apartments={apartments} onOpen={onOpenDetail} />)}</div>
       </div>
     </div>
   );
@@ -119,21 +119,100 @@ function SourceTag({ src, lang, STR }) {
   return <span className="inline-flex items-center gap-1.5 px-2.5 h-6 rounded-full text-[11.5px] font-bold" style={{ color: s.color, background: s.bg }}><span className="w-1.5 h-1.5 rounded-full" style={{ background: s.color }} />{STR[lang][s.key]}</span>;
 }
 
-function BookingRow({ b, lang, STR, onCancel, onDelete, onShorten, apartments }) {
+function BookingRow({ b, lang, STR, onCancel, onDelete, onShorten, onOpen, apartments }) {
   const apt = (apartments || []).find((a) => a.id === b.apt) || aptById(b.apt);
   if (!apt) return null;
+  const open = onOpen ? () => onOpen(b) : undefined;
   return (
-    <div className="flex items-center gap-3 p-3 rounded-xl border border-line bg-white">
+    <div role={open ? "button" : undefined} tabIndex={open ? 0 : undefined}
+      onClick={open} onKeyDown={open ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); } } : undefined}
+      className={`flex items-center gap-3 p-3 rounded-xl border border-line bg-white ${open ? "cursor-pointer hover:bg-black/[.02] transition" : ""}`}>
       <div className="w-11 h-11 rounded-lg overflow-hidden shrink-0"><Photo tone={apt.tone} idx={0} eager showLabel={false} className="w-full h-full" /></div>
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2"><span className="font-bold text-[14px] truncate">{b.guest}</span><SourceTag src={b.source} lang={lang} STR={STR} /></div>
         <div className="text-[12.5px] text-inksoft truncate">{apt.title[lang]} <span className="font-mono text-inksoft/65 select-all">#{b.apt}</span> · {fmtRange(new Date(b.from), new Date(b.to), lang)}</div>
       </div>
       <div className="text-right shrink-0 hidden sm:block"><div className="font-bold text-[15px] tnum">${b.total}</div><div className="text-[11px] text-inksoft tnum">{b.phone}</div></div>
-      {onShorten && b.status === "active" && b.nights > 1 && b.source !== "booking" && <button onClick={() => onShorten(b)} title={lang === "ru" ? "Ранний выезд" : lang === "uz" ? "Erta chiqish" : "Early checkout"} className="shrink-0 w-8 h-8 grid place-items-center rounded-full text-inksoft hover:text-green-700 hover:bg-green-50"><Icon name="clock" size={15} /></button>}
-      {onCancel && b.status === "active" && <button onClick={() => onCancel(b)} className="shrink-0 text-[12.5px] font-semibold text-red-600 px-3 h-8 rounded-full hover:bg-red-50">{STR[lang].a_cancel}</button>}
-      {onDelete && <button onClick={() => onDelete(b)} title={lang === "ru" ? "Удалить" : lang === "uz" ? "Oʻchirish" : "Delete"} className="shrink-0 w-8 h-8 grid place-items-center rounded-full text-inksoft hover:text-red-600 hover:bg-red-50"><Icon name="trash" size={15} /></button>}
+      {onShorten && b.status === "active" && b.nights > 1 && b.source !== "booking" && <button onClick={(e) => { e.stopPropagation(); onShorten(b); }} title={lang === "ru" ? "Ранний выезд" : lang === "uz" ? "Erta chiqish" : "Early checkout"} className="shrink-0 w-8 h-8 grid place-items-center rounded-full text-inksoft hover:text-green-700 hover:bg-green-50"><Icon name="clock" size={15} /></button>}
+      {onCancel && b.status === "active" && <button onClick={(e) => { e.stopPropagation(); onCancel(b); }} className="shrink-0 text-[12.5px] font-semibold text-red-600 px-3 h-8 rounded-full hover:bg-red-50">{STR[lang].a_cancel}</button>}
+      {onDelete && <button onClick={(e) => { e.stopPropagation(); onDelete(b); }} title={lang === "ru" ? "Удалить" : lang === "uz" ? "Oʻchirish" : "Delete"} className="shrink-0 w-8 h-8 grid place-items-center rounded-full text-inksoft hover:text-red-600 hover:bg-red-50"><Icon name="trash" size={15} /></button>}
+      {open && <Icon name="chevR" size={16} className="text-inksoft/45 shrink-0" />}
     </div>
+  );
+}
+
+// ---- booking detail bottom-sheet (shared by the dashboard + bookings list rows) ----
+function bkStatusMeta(status, STR, lang) {
+  if (status === "cancelled") return { label: STR[lang].bd_cancelled, color: "#9a4a3c", bg: "#fbeae6" };
+  if (status === "checked-out" || status === "past") return { label: STR[lang].bd_past, color: "#5a5750", bg: "#eceae5" };
+  return { label: STR[lang].bd_active, color: "#1B5E40", bg: "#EAF1EC" };
+}
+
+function MetaRow({ icon, label, value, href }) {
+  return (
+    <div className="flex items-center gap-3 py-2.5 border-b border-line last:border-0">
+      <Icon name={icon} size={16} className="text-inksoft shrink-0" />
+      <span className="text-[12.5px] text-inksoft shrink-0">{label}</span>
+      {href
+        ? <a href={href} onClick={(e) => e.stopPropagation()} className="text-[13.5px] font-semibold text-green-700 truncate hover:underline ml-auto">{value}</a>
+        : <span className="text-[13.5px] font-semibold text-ink truncate ml-auto select-all">{value}</span>}
+    </div>
+  );
+}
+
+function BookingDetailSheet({ booking, lang, STR, desktop, apartments, onClose, onCancel }) {
+  const b = booking;
+  const apt = b ? ((apartments || []).find((a) => a.id === b.apt) || aptById(b.apt)) : null;
+  const fmtDay = (iso) => {
+    if (!iso) return "—";
+    const d = new Date(iso.length > 10 ? iso : iso + "T00:00:00");
+    if (isNaN(d.getTime())) return iso;
+    return `${calWD[lang][(d.getDay() + 6) % 7]}, ${d.getDate()} ${calMonths[lang][d.getMonth()]}`;
+  };
+  const st = b ? bkStatusMeta(b.status, STR, lang) : null;
+  const tg = b?.tg ? b.tg.replace(/^@/, "") : "";
+  const btn = "flex-1 h-12 rounded-2xl font-bold text-[14px] transition flex items-center justify-center gap-2";
+  return (
+    <Sheet open={!!b} onClose={onClose} desktop={desktop} title={b ? b.guest : ""}
+      footer={b && (b.phone || tg || (b.status === "active" && onCancel)) ? (
+        <div className="flex items-center gap-2">
+          {b.phone && <a href={`tel:${b.phone}`} onClick={(e) => e.stopPropagation()} className={`${btn} border border-line bg-white text-ink hover:border-ink/30`}><Icon name="phone" size={16} />{STR[lang].bd_call}</a>}
+          {tg && <a href={`https://t.me/${tg}`} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className={`${btn} border border-line bg-white text-ink hover:border-ink/30`}><Icon name="tg" size={16} />Telegram</a>}
+          {b.status === "active" && onCancel && <button onClick={() => onCancel(b)} className={`${btn} bg-red-600 text-white hover:bg-red-700`}><Icon name="trash" size={16} />{STR[lang].a_cancel}</button>}
+        </div>
+      ) : null}>
+      {b && (
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 px-2.5 h-6 rounded-full text-[11.5px] font-bold" style={{ color: st.color, background: st.bg }}><span className="w-1.5 h-1.5 rounded-full" style={{ background: st.color }} />{st.label}</span>
+            <SourceTag src={b.source} lang={lang} STR={STR} />
+          </div>
+          {apt && <div className="text-[13.5px] text-inksoft">{apt.title[lang]} <span className="font-mono text-inksoft/70">#{b.apt}</span></div>}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="rounded-xl bg-cream border border-line p-3">
+              <div className="text-[10.5px] font-bold uppercase tracking-wide text-inksoft">{STR[lang].from}</div>
+              <div className="text-[14px] font-bold mt-0.5">{fmtDay(b.from)}</div>
+            </div>
+            <div className="rounded-xl bg-cream border border-line p-3">
+              <div className="text-[10.5px] font-bold uppercase tracking-wide text-inksoft">{STR[lang].to}</div>
+              <div className="text-[14px] font-bold mt-0.5">{fmtDay(b.to)}</div>
+            </div>
+          </div>
+          <div className="text-[12.5px] text-inksoft text-center -mt-1">{STR[lang].night_n(b.nights || 0)}</div>
+          <div className="rounded-xl border border-line px-3.5">
+            {b.phone && <MetaRow icon="phone" label={STR[lang].bd_phone} value={b.phone} href={`tel:${b.phone}`} />}
+            {tg && <MetaRow icon="tg" label="Telegram" value={"@" + tg} href={`https://t.me/${tg}`} />}
+            {b.email && <MetaRow icon="mail" label="Email" value={b.email} href={`mailto:${b.email}`} />}
+            <MetaRow icon="clipboard" label={STR[lang].bd_ref} value={b.otaRef || b.id} />
+            {b.created && <MetaRow icon="cal" label={STR[lang].bd_booked} value={fmtDay(b.created)} />}
+          </div>
+          <div className="flex items-center justify-between pt-1">
+            <span className="font-serif text-[16px]">{STR[lang].total}</span>
+            <span className="font-bold text-[20px] tnum">${b.total ?? "—"}</span>
+          </div>
+        </div>
+      )}
+    </Sheet>
   );
 }
 
@@ -243,7 +322,7 @@ function EarlyCheckoutForm({ lang, STR, b, onDone }) {
 }
 
 // ---- bookings list ----
-function BookingsList({ lang, STR, bookings, apartments, onChanged }) {
+function BookingsList({ lang, STR, bookings, apartments, onChanged, onOpenDetail }) {
   const [items, setItems] = useState(bookings || []);
   const [adding, setAdding] = useState(false);
   const [shorten, setShorten] = useState(null);
@@ -278,7 +357,7 @@ function BookingsList({ lang, STR, bookings, apartments, onChanged }) {
       <div className="space-y-2">
         {items.length === 0
           ? <div className="text-[14px] text-inksoft py-8 text-center border border-dashed border-line rounded-2xl">—</div>
-          : items.map((b) => <BookingRow key={b.id} b={b} lang={lang} STR={STR} onCancel={cancel} onDelete={del} onShorten={setShorten} apartments={apartments} />)}
+          : items.map((b) => <BookingRow key={b.id} b={b} lang={lang} STR={STR} onCancel={cancel} onDelete={del} onShorten={setShorten} onOpen={onOpenDetail} apartments={apartments} />)}
       </div>
       <Sheet open={adding} onClose={() => setAdding(false)} title={lang === "ru" ? "Ручная бронь" : lang === "uz" ? "Qoʻlda bron" : "Manual booking"} desktop>
         <ManualBookingForm lang={lang} STR={STR} apartments={apartments} onDone={() => { setAdding(false); onChanged && onChanged(); }} />
@@ -800,6 +879,7 @@ export function Admin({ lang, STR, device, onExit, openLang, role, auth, onLogin
   const [editId, setEditId] = useState(null);
   const [apts, setApts] = useState([]);
   const [bookings, setBookings] = useState([]);
+  const [detail, setDetail] = useState(null); // booking shown in the detail bottom-sheet
   useEffect(() => {
     if (role !== "admin") return;
     getApartments().then(setApts);
@@ -830,6 +910,19 @@ export function Admin({ lang, STR, device, onExit, openLang, role, auth, onLogin
     setEditId(id);
     window.history.pushState({ screen: "admin", editId: id }, "", tab === "dash" ? "#admin/list" : "#admin/" + tab);
   };
+  // cancel from the detail sheet — Admin owns `bookings`, so this propagates to every view (the
+  // BookingsList re-syncs its local items from the bookings prop)
+  async function cancelFromDetail(b) {
+    setBookings((arr) => arr.map((i) => (i.id === b.id ? { ...i, status: "cancelled" } : i)));
+    setDetail(null);
+    try {
+      await cancelBooking(b.id);
+    } catch (e) {
+      console.error("cancelBooking failed:", e);
+      setBookings((arr) => arr.map((i) => (i.id === b.id ? { ...i, status: b.status } : i)));
+      window.alert(lang === "ru" ? "Не удалось отменить (Beds24)." : lang === "uz" ? "Bekor qilib boʻlmadi (Beds24)." : "Cancel failed (Beds24).");
+    }
+  }
 
   // Drive the layout off the device prop (NOT CSS md: breakpoints) so it stays correct
   // inside a phone device frame, where the real viewport is wider than the rendered shell.
@@ -878,15 +971,16 @@ export function Admin({ lang, STR, device, onExit, openLang, role, auth, onLogin
         </header>
         <main className={`flex-1 ${desktop ? "px-8" : "px-5"} py-6 overflow-y-auto no-scrollbar`}>
           {editId ? <EditApt lang={lang} STR={STR} id={editId} onBack={() => window.history.back()} apartments={apts} onSaved={() => getApartments().then(setApts)} />
-            : tab === "dash" ? <Dashboard lang={lang} STR={STR} bookings={bookings} apartments={apts} />
+            : tab === "dash" ? <Dashboard lang={lang} STR={STR} bookings={bookings} apartments={apts} onOpenDetail={setDetail} />
             : tab === "list" ? <Listings lang={lang} STR={STR} onEdit={goEdit} apartments={apts} />
             : tab === "cal" ? <CalManager lang={lang} STR={STR} apartments={apts} bookings={bookings} device={device} />
             : tab === "reviews" ? <ReviewsModeration lang={lang} STR={STR} apartments={apts} />
             : tab === "pfile" ? <PropertyFilesSection lang={lang} STR={STR} apartments={apts} />
             : tab === "suppliers" ? <SuppliersSection lang={lang} STR={STR} />
-            : <BookingsList lang={lang} STR={STR} bookings={bookings} apartments={apts} onChanged={() => getAllBookings().then(setBookings)} />}
+            : <BookingsList lang={lang} STR={STR} bookings={bookings} apartments={apts} onChanged={() => getAllBookings().then(setBookings)} onOpenDetail={setDetail} />}
         </main>
       </div>
+      <BookingDetailSheet booking={detail} lang={lang} STR={STR} desktop={desktop} apartments={apts} onClose={() => setDetail(null)} onCancel={cancelFromDetail} />
     </div>
   );
 }

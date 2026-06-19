@@ -203,6 +203,9 @@ export async function getAllBookings() {
     total: b.total_usd,
     source: b.source,
     status: b.status,
+    email: b.email || "",
+    otaRef: b.ota_reference || "",
+    created: b.created_at || "",
   }));
 }
 
