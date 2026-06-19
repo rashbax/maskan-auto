@@ -176,9 +176,23 @@ export function Stepper({ value, min = 1, max = 12, onChange }) {
 
 // ---------------- Bottom sheet / modal ----------------
 export function Sheet({ open, onClose, children, title, desktop, footer }) {
+  // While the sheet is open, freeze the page behind it: without this the booking list scrolls
+  // under the sheet, and a pull-up gesture rubber-bands the body so the sheet's bottom detaches.
+  useEffect(() => {
+    if (!open) return;
+    const body = document.body;
+    const prevOverflow = body.style.overflow;
+    const prevOverscroll = body.style.overscrollBehavior;
+    body.style.overflow = "hidden";
+    body.style.overscrollBehavior = "none";
+    return () => {
+      body.style.overflow = prevOverflow;
+      body.style.overscrollBehavior = prevOverscroll;
+    };
+  }, [open]);
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-end justify-center overscroll-none" onClick={onClose}>
       <div className="absolute inset-0 bg-ink/45 pop-in" />
       <div onClick={(e) => e.stopPropagation()}
         className={`relative w-full bg-canvas sheet-up ${desktop ? "max-w-md rounded-3xl m-auto" : "rounded-t-3xl"} shadow-pop max-h-[90%] flex flex-col min-h-0`}>
@@ -186,7 +200,7 @@ export function Sheet({ open, onClose, children, title, desktop, footer }) {
           <div className="font-serif text-[19px]">{title}</div>
           <button onClick={onClose} className="w-9 h-9 grid place-items-center rounded-full hover:bg-black/5"><Icon name="x" size={20} /></button>
         </div>
-        <div className="overflow-y-auto no-scrollbar px-5 pb-5 flex-1 min-h-0">{children}</div>
+        <div className="overflow-y-auto overscroll-contain no-scrollbar px-5 pb-5 flex-1 min-h-0">{children}</div>
         {footer && <div className="shrink-0 px-5 pt-3 pb-4 border-t border-line bg-canvas">{footer}</div>}
       </div>
     </div>
