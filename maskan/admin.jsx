@@ -119,7 +119,7 @@ function SourceTag({ src, lang, STR }) {
   return <span className="inline-flex items-center gap-1.5 px-2.5 h-6 rounded-full text-[11.5px] font-bold" style={{ color: s.color, background: s.bg }}><span className="w-1.5 h-1.5 rounded-full" style={{ background: s.color }} />{STR[lang][s.key]}</span>;
 }
 
-function BookingRow({ b, lang, STR, onCancel, onDelete, onShorten, onOpen, apartments }) {
+function BookingRow({ b, lang, STR, onOpen, apartments }) {
   const apt = (apartments || []).find((a) => a.id === b.apt) || aptById(b.apt);
   if (!apt) return null;
   const open = onOpen ? () => onOpen(b) : undefined;
@@ -139,9 +139,6 @@ function BookingRow({ b, lang, STR, onCancel, onDelete, onShorten, onOpen, apart
         <div className="text-[12px] text-inksoft flex items-center gap-1.5 mt-0.5"><Icon name="cal" size={13} className="shrink-0" /><span className="truncate">{fmtRange(new Date(b.from), new Date(b.to), lang)} · {STR[lang].night_n(b.nights || 0)}</span></div>
       </div>
       <div className="font-bold text-[15px] tnum shrink-0">${b.total}</div>
-      {onShorten && b.status === "active" && b.nights > 1 && b.source !== "booking" && <button onClick={(e) => { e.stopPropagation(); onShorten(b); }} title={lang === "ru" ? "Ранний выезд" : lang === "uz" ? "Erta chiqish" : "Early checkout"} className="shrink-0 w-8 h-8 grid place-items-center rounded-full text-inksoft hover:text-green-700 hover:bg-green-50"><Icon name="clock" size={15} /></button>}
-      {onCancel && b.status === "active" && <button onClick={(e) => { e.stopPropagation(); onCancel(b); }} className="shrink-0 text-[12.5px] font-semibold text-red-600 px-3 h-8 rounded-full hover:bg-red-50">{STR[lang].a_cancel}</button>}
-      {onDelete && <button onClick={(e) => { e.stopPropagation(); onDelete(b); }} title={lang === "ru" ? "Удалить" : lang === "uz" ? "Oʻchirish" : "Delete"} className="shrink-0 w-8 h-8 grid place-items-center rounded-full text-inksoft hover:text-red-600 hover:bg-red-50"><Icon name="trash" size={15} /></button>}
       {open && <Icon name="chevR" size={16} className="text-inksoft/45 shrink-0" />}
     </div>
   );
@@ -166,7 +163,7 @@ function MetaRow({ icon, label, value, href }) {
   );
 }
 
-function BookingDetailSheet({ booking, lang, STR, desktop, apartments, onClose, onCancel }) {
+function BookingDetailSheet({ booking, lang, STR, desktop, apartments, onClose, onCancel, onDelete, onShorten }) {
   const b = booking;
   const apt = b ? ((apartments || []).find((a) => a.id === b.apt) || aptById(b.apt)) : null;
   const fmtDay = (iso) => {
@@ -177,16 +174,25 @@ function BookingDetailSheet({ booking, lang, STR, desktop, apartments, onClose, 
   };
   const st = b ? bkStatusMeta(b.status, STR, lang) : null;
   const tg = b?.tg ? b.tg.replace(/^@/, "") : "";
-  const ico = "w-12 h-12 grid place-items-center rounded-2xl border border-line bg-white text-ink hover:border-ink/30 transition shrink-0";
+  const canShorten = b && b.status === "active" && b.nights > 1 && b.source !== "booking" && onShorten;
+  const act = "flex-1 min-w-0 h-12 rounded-2xl font-bold text-[13.5px] transition flex items-center justify-center gap-1.5";
   return (
     <Sheet open={!!b} onClose={onClose} desktop={desktop} title={b ? b.guest : ""}
-      footer={b && (b.phone || tg || (b.status === "active" && onCancel)) ? (
-        <div className="flex items-center gap-2">
-          {b.phone && <a href={`tel:${b.phone}`} onClick={(e) => e.stopPropagation()} aria-label={STR[lang].bd_call} title={STR[lang].bd_call} className={ico}><Icon name="phone" size={18} /></a>}
-          {tg && <a href={`https://t.me/${tg}`} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} aria-label="Telegram" title="Telegram" className={ico}><Icon name="tg" size={18} /></a>}
-          {b.status === "active" && onCancel
-            ? <button onClick={() => onCancel(b)} className="flex-1 h-12 rounded-2xl bg-red-600 text-white font-bold text-[14px] hover:bg-red-700 transition flex items-center justify-center gap-2"><Icon name="trash" size={16} />{STR[lang].a_cancel}</button>
-            : <span className="flex-1" />}
+      footer={b ? (
+        <div className="space-y-2">
+          {(b.phone || tg) && (
+            <div className="flex items-center gap-2">
+              {b.phone && <a href={`tel:${b.phone}`} onClick={(e) => e.stopPropagation()} className={`${act} border border-line bg-white text-ink hover:border-ink/30`}><Icon name="phone" size={16} />{STR[lang].bd_call}</a>}
+              {tg && <a href={`https://t.me/${tg}`} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className={`${act} border border-line bg-white text-ink hover:border-ink/30`}><Icon name="tg" size={16} />Telegram</a>}
+            </div>
+          )}
+          {(canShorten || (b.status === "active" && onCancel) || onDelete) && (
+            <div className="flex items-center gap-2">
+              {canShorten && <button onClick={() => onShorten(b)} className={`${act} border border-green-600/40 text-green-700 hover:bg-green-50`}><Icon name="clock" size={16} />{lang === "ru" ? "Ранний выезд" : lang === "uz" ? "Erta chiqish" : "Early checkout"}</button>}
+              {b.status === "active" && onCancel && <button onClick={() => onCancel(b)} className={`${act} bg-red-600 text-white hover:bg-red-700`}><Icon name="x" size={16} />{STR[lang].a_cancel}</button>}
+              {onDelete && <button onClick={() => onDelete(b)} aria-label={lang === "ru" ? "Удалить" : lang === "uz" ? "Oʻchirish" : "Delete"} title={lang === "ru" ? "Удалить" : lang === "uz" ? "Oʻchirish" : "Delete"} className="w-12 h-12 shrink-0 grid place-items-center rounded-2xl border border-line text-inksoft hover:text-red-600 hover:bg-red-50 transition"><Icon name="trash" size={16} /></button>}
+            </div>
+          )}
         </div>
       ) : null}>
       {b && (
@@ -331,47 +337,18 @@ function EarlyCheckoutForm({ lang, STR, b, onDone }) {
 
 // ---- bookings list ----
 function BookingsList({ lang, STR, bookings, apartments, onChanged, onOpenDetail }) {
-  const [items, setItems] = useState(bookings || []);
   const [adding, setAdding] = useState(false);
-  const [shorten, setShorten] = useState(null);
-  useEffect(() => { setItems(bookings || []); }, [bookings]);
-  async function cancel(x) {
-    const prev = x.status;
-    setItems((arr) => arr.map((i) => (i.id === x.id ? { ...i, status: "cancelled" } : i)));
-    try {
-      await cancelBooking(x.id);
-    } catch (e) {
-      console.error("cancelBooking failed:", e);
-      setItems((arr) => arr.map((i) => (i.id === x.id ? { ...i, status: prev } : i)));
-      window.alert(lang === "ru" ? "Не удалось отменить (Beds24)." : lang === "uz" ? "Bekor qilib boʻlmadi (Beds24)." : "Cancel failed (Beds24).");
-    }
-  }
-  async function del(x) {
-    const msg = lang === "ru" ? "Удалить эту бронь навсегда?" : lang === "uz" ? "Bu bronni butunlay oʻchirilsinmi?" : "Delete this booking permanently?";
-    if (!window.confirm(msg)) return;
-    setItems((arr) => arr.filter((i) => i.id !== x.id));
-    try { await deleteBooking(x.id); } catch (e) { console.error("deleteBooking failed:", e); }
-  }
-  function onShortenDone(r) {
-    if (shorten) {
-      setItems((arr) => arr.map((i) => (i.id === shorten.id ? { ...i, to: r.checkout, nights: r.nights, total: r.total_usd } : i)));
-      window.alert((lang === "ru" ? "К возврату гостю: $" : lang === "uz" ? "Mehmonga qaytariladi: $" : "Refund to guest: $") + (r.refund ?? 0));
-    }
-    setShorten(null);
-  }
+  const list = bookings || [];
   return (
     <div>
       <div className="flex justify-end mb-4"><Button icon="plusbox" onClick={() => setAdding(true)}>{lang === "ru" ? "Добавить бронь" : lang === "uz" ? "Bron qoʻshish" : "Add booking"}</Button></div>
       <div className="space-y-2">
-        {items.length === 0
+        {list.length === 0
           ? <div className="text-[14px] text-inksoft py-8 text-center border border-dashed border-line rounded-2xl">—</div>
-          : items.map((b) => <BookingRow key={b.id} b={b} lang={lang} STR={STR} onCancel={cancel} onDelete={del} onShorten={setShorten} onOpen={onOpenDetail} apartments={apartments} />)}
+          : list.map((b) => <BookingRow key={b.id} b={b} lang={lang} STR={STR} onOpen={onOpenDetail} apartments={apartments} />)}
       </div>
       <Sheet open={adding} onClose={() => setAdding(false)} title={lang === "ru" ? "Ручная бронь" : lang === "uz" ? "Qoʻlda bron" : "Manual booking"} desktop>
         <ManualBookingForm lang={lang} STR={STR} apartments={apartments} onDone={() => { setAdding(false); onChanged && onChanged(); }} />
-      </Sheet>
-      <Sheet open={!!shorten} onClose={() => setShorten(null)} title={lang === "ru" ? "Ранний выезд" : lang === "uz" ? "Erta chiqish" : "Early checkout"} desktop>
-        {shorten && <EarlyCheckoutForm lang={lang} STR={STR} b={shorten} onDone={onShortenDone} />}
       </Sheet>
     </div>
   );
@@ -888,6 +865,7 @@ export function Admin({ lang, STR, device, onExit, openLang, role, auth, onLogin
   const [apts, setApts] = useState([]);
   const [bookings, setBookings] = useState([]);
   const [detail, setDetail] = useState(null); // booking shown in the detail bottom-sheet
+  const [shortenTarget, setShortenTarget] = useState(null); // booking being shortened (early checkout)
   useEffect(() => {
     if (role !== "admin") return;
     getApartments().then(setApts);
@@ -930,6 +908,26 @@ export function Admin({ lang, STR, device, onExit, openLang, role, auth, onLogin
       setBookings((arr) => arr.map((i) => (i.id === b.id ? { ...i, status: b.status } : i)));
       window.alert(lang === "ru" ? "Не удалось отменить (Beds24)." : lang === "uz" ? "Bekor qilib boʻlmadi (Beds24)." : "Cancel failed (Beds24).");
     }
+  }
+  async function deleteFromDetail(b) {
+    const msg = lang === "ru" ? "Удалить эту бронь навсегда?" : lang === "uz" ? "Bu bronni butunlay oʻchirilsinmi?" : "Delete this booking permanently?";
+    if (!window.confirm(msg)) return;
+    setBookings((arr) => arr.filter((i) => i.id !== b.id));
+    setDetail(null);
+    try {
+      await deleteBooking(b.id);
+    } catch (e) {
+      console.error("deleteBooking failed:", e);
+      getAllBookings().then(setBookings); // re-sync to the DB truth
+      window.alert(lang === "ru" ? "Не удалось удалить." : lang === "uz" ? "Oʻchirib boʻlmadi." : "Delete failed.");
+    }
+  }
+  function onShortenDone(r) {
+    if (shortenTarget) {
+      setBookings((arr) => arr.map((i) => (i.id === shortenTarget.id ? { ...i, to: r.checkout, nights: r.nights, total: r.total_usd } : i)));
+      window.alert((lang === "ru" ? "К возврату гостю: $" : lang === "uz" ? "Mehmonga qaytariladi: $" : "Refund to guest: $") + (r.refund ?? 0));
+    }
+    setShortenTarget(null);
   }
 
   // Drive the layout off the device prop (NOT CSS md: breakpoints) so it stays correct
@@ -988,7 +986,10 @@ export function Admin({ lang, STR, device, onExit, openLang, role, auth, onLogin
             : <BookingsList lang={lang} STR={STR} bookings={bookings} apartments={apts} onChanged={() => getAllBookings().then(setBookings)} onOpenDetail={setDetail} />}
         </main>
       </div>
-      <BookingDetailSheet booking={detail} lang={lang} STR={STR} desktop={desktop} apartments={apts} onClose={() => setDetail(null)} onCancel={cancelFromDetail} />
+      <BookingDetailSheet booking={detail} lang={lang} STR={STR} desktop={desktop} apartments={apts} onClose={() => setDetail(null)} onCancel={cancelFromDetail} onDelete={deleteFromDetail} onShorten={(b) => { setDetail(null); setShortenTarget(b); }} />
+      <Sheet open={!!shortenTarget} onClose={() => setShortenTarget(null)} title={lang === "ru" ? "Ранний выезд" : lang === "uz" ? "Erta chiqish" : "Early checkout"} desktop={desktop}>
+        {shortenTarget && <EarlyCheckoutForm lang={lang} STR={STR} b={shortenTarget} onDone={onShortenDone} />}
+      </Sheet>
     </div>
   );
 }

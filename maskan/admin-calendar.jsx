@@ -4,7 +4,7 @@
 // Covers come from the apartment's existing photos (apt.photoUrls[0]) — read-only.
 import { useState, useEffect, useRef, useMemo } from "react";
 import { MASKAN } from "./data";
-import { Icon, Photo, Button } from "./ui";
+import { Icon, Photo } from "./ui";
 import { calMonths, calWD, buildMonth, dOnly } from "./calendar";
 import { fmtRange } from "./catalog";
 import { getAllBlocks, blockDay, unblockDay } from "./db";
@@ -241,17 +241,15 @@ function Calendar({ lang, STR, apt, bookings, view, setView, draft, setDraft, co
 
       {/* floating save bar — fixed to the viewport so you never scroll to reach it */}
       {dirty && (
-        <div className={`fixed z-40 ${desktop ? "bottom-6 left-1/2 -translate-x-1/2" : "inset-x-0 bottom-0"}`}>
-          <div className={`flex items-center gap-3 bg-white shadow-pop border-green-600/30 ${desktop ? "rounded-full border px-4 py-2.5" : "border-t px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] justify-between"}`}>
-            <div className="flex items-center gap-2 text-[13px] min-w-0">
-              <span className="w-2 h-2 rounded-full bg-green-600 animate-pulse shrink-0" />
-              <span className="font-bold whitespace-nowrap">{STR[lang].cal_unsaved}</span>
-              <span className="text-inksoft truncate">· <span className="tnum">{toBlock}</span> {STR[lang].cal_to_block} · <span className="tnum">{toOpen}</span> {STR[lang].cal_to_open}</span>
+        <div className={`fixed z-40 ${desktop ? "bottom-6 left-1/2 -translate-x-1/2 max-w-[calc(100vw-2rem)]" : "inset-x-0 bottom-0"}`}>
+          <div className={`flex items-center gap-2 bg-white shadow-pop border-green-600/30 ${desktop ? "rounded-2xl border px-3 py-2.5" : "border-t px-3 py-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))]"}`}>
+            <span className="w-2 h-2 rounded-full bg-green-600 animate-pulse shrink-0" />
+            <div className="min-w-0 flex-1 leading-tight">
+              <div className="text-[12.5px] font-bold truncate">{STR[lang].cal_unsaved}</div>
+              <div className="text-[11px] text-inksoft truncate"><span className="tnum">{toBlock}</span> {STR[lang].cal_to_block} · <span className="tnum">{toOpen}</span> {STR[lang].cal_to_open}</div>
             </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <Button size="sm" variant="ghost" onClick={onCancel}>{STR[lang].a_cancel}</Button>
-              <Button size="sm" icon="check" onClick={onSave}>{STR[lang].a_save}</Button>
-            </div>
+            <button onClick={onCancel} className="shrink-0 h-9 px-3 rounded-full text-[13px] font-semibold text-inksoft hover:bg-black/5">{STR[lang].a_cancel}</button>
+            <button onClick={onSave} className="shrink-0 h-9 px-4 rounded-full bg-green-700 text-cream text-[13px] font-bold hover:bg-green-800 inline-flex items-center gap-1.5"><Icon name="check" size={15} />{STR[lang].a_save}</button>
           </div>
         </div>
       )}
