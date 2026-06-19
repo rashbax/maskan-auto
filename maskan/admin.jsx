@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef, createRef } from "react";
 import { MASKAN } from "./data";
 import { Icon, Logo, Button, Chip, Badge, Photo, Stepper, AMENITY_ICON, GoogleG, Sheet } from "./ui";
-import { calMonths } from "./calendar";
+import { calMonths, calWD } from "./calendar";
 import { fmtRange } from "./catalog";
 import { StarRow } from "./reviews";
 import { getApartments, getAllBookings, cancelBooking, deleteBooking, shortenBooking, createManualBooking, getAllBlocks, getAllReviews, setReviewHidden, setReviewReply, saveApartment, deleteApartment, requestUploadUrl, addPhoto, getPhotos, deletePhoto, setPhotoOrder } from "./db";
@@ -123,16 +123,22 @@ function BookingRow({ b, lang, STR, onCancel, onDelete, onShorten, onOpen, apart
   const apt = (apartments || []).find((a) => a.id === b.apt) || aptById(b.apt);
   if (!apt) return null;
   const open = onOpen ? () => onOpen(b) : undefined;
+  const st = bkStatusMeta(b.status, STR, lang);
   return (
     <div role={open ? "button" : undefined} tabIndex={open ? 0 : undefined}
       onClick={open} onKeyDown={open ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); } } : undefined}
       className={`flex items-center gap-3 p-3 rounded-xl border border-line bg-white ${open ? "cursor-pointer hover:bg-black/[.02] transition" : ""}`}>
       <div className="w-11 h-11 rounded-lg overflow-hidden shrink-0"><Photo tone={apt.tone} idx={0} eager showLabel={false} className="w-full h-full" /></div>
       <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2"><span className="font-bold text-[14px] truncate">{b.guest}</span><SourceTag src={b.source} lang={lang} STR={STR} /></div>
-        <div className="text-[12.5px] text-inksoft truncate">{apt.title[lang]} <span className="font-mono text-inksoft/65 select-all">#{b.apt}</span> · {fmtRange(new Date(b.from), new Date(b.to), lang)}</div>
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="font-bold text-[14px] truncate max-w-full">{b.guest}</span>
+          <span className="inline-flex items-center gap-1 px-2 h-5 rounded-full text-[10.5px] font-bold shrink-0" style={{ color: st.color, background: st.bg }}><span className="w-1.5 h-1.5 rounded-full" style={{ background: st.color }} />{st.label}</span>
+          <SourceTag src={b.source} lang={lang} STR={STR} />
+        </div>
+        <div className="text-[12.5px] text-inksoft truncate mt-0.5"><span className="font-mono text-inksoft/70 select-all">#{b.apt}</span> · {apt.title[lang]}</div>
+        <div className="text-[12px] text-inksoft flex items-center gap-1.5 mt-0.5"><Icon name="cal" size={13} className="shrink-0" /><span className="truncate">{fmtRange(new Date(b.from), new Date(b.to), lang)} · {STR[lang].night_n(b.nights || 0)}</span></div>
       </div>
-      <div className="text-right shrink-0 hidden sm:block"><div className="font-bold text-[15px] tnum">${b.total}</div><div className="text-[11px] text-inksoft tnum">{b.phone}</div></div>
+      <div className="font-bold text-[15px] tnum shrink-0">${b.total}</div>
       {onShorten && b.status === "active" && b.nights > 1 && b.source !== "booking" && <button onClick={(e) => { e.stopPropagation(); onShorten(b); }} title={lang === "ru" ? "Ранний выезд" : lang === "uz" ? "Erta chiqish" : "Early checkout"} className="shrink-0 w-8 h-8 grid place-items-center rounded-full text-inksoft hover:text-green-700 hover:bg-green-50"><Icon name="clock" size={15} /></button>}
       {onCancel && b.status === "active" && <button onClick={(e) => { e.stopPropagation(); onCancel(b); }} className="shrink-0 text-[12.5px] font-semibold text-red-600 px-3 h-8 rounded-full hover:bg-red-50">{STR[lang].a_cancel}</button>}
       {onDelete && <button onClick={(e) => { e.stopPropagation(); onDelete(b); }} title={lang === "ru" ? "Удалить" : lang === "uz" ? "Oʻchirish" : "Delete"} className="shrink-0 w-8 h-8 grid place-items-center rounded-full text-inksoft hover:text-red-600 hover:bg-red-50"><Icon name="trash" size={15} /></button>}
