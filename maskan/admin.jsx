@@ -171,14 +171,16 @@ function BookingDetailSheet({ booking, lang, STR, desktop, apartments, onClose, 
   };
   const st = b ? bkStatusMeta(b.status, STR, lang) : null;
   const tg = b?.tg ? b.tg.replace(/^@/, "") : "";
-  const btn = "flex-1 h-12 rounded-2xl font-bold text-[14px] transition flex items-center justify-center gap-2";
+  const ico = "w-12 h-12 grid place-items-center rounded-2xl border border-line bg-white text-ink hover:border-ink/30 transition shrink-0";
   return (
     <Sheet open={!!b} onClose={onClose} desktop={desktop} title={b ? b.guest : ""}
       footer={b && (b.phone || tg || (b.status === "active" && onCancel)) ? (
         <div className="flex items-center gap-2">
-          {b.phone && <a href={`tel:${b.phone}`} onClick={(e) => e.stopPropagation()} className={`${btn} border border-line bg-white text-ink hover:border-ink/30`}><Icon name="phone" size={16} />{STR[lang].bd_call}</a>}
-          {tg && <a href={`https://t.me/${tg}`} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className={`${btn} border border-line bg-white text-ink hover:border-ink/30`}><Icon name="tg" size={16} />Telegram</a>}
-          {b.status === "active" && onCancel && <button onClick={() => onCancel(b)} className={`${btn} bg-red-600 text-white hover:bg-red-700`}><Icon name="trash" size={16} />{STR[lang].a_cancel}</button>}
+          {b.phone && <a href={`tel:${b.phone}`} onClick={(e) => e.stopPropagation()} aria-label={STR[lang].bd_call} title={STR[lang].bd_call} className={ico}><Icon name="phone" size={18} /></a>}
+          {tg && <a href={`https://t.me/${tg}`} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} aria-label="Telegram" title="Telegram" className={ico}><Icon name="tg" size={18} /></a>}
+          {b.status === "active" && onCancel
+            ? <button onClick={() => onCancel(b)} className="flex-1 h-12 rounded-2xl bg-red-600 text-white font-bold text-[14px] hover:bg-red-700 transition flex items-center justify-center gap-2"><Icon name="trash" size={16} />{STR[lang].a_cancel}</button>
+            : <span className="flex-1" />}
         </div>
       ) : null}>
       {b && (
