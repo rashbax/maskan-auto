@@ -65,7 +65,7 @@ function OtpStep({ lang, STR, phone, onDone, onSkip }) {
 }
 
 // ---- confirmation ----
-function Confirmation({ apt, range, form, lang, STR, onHome, bookingId }) {
+function Confirmation({ apt, range, form, lang, STR, onHome, bookingId, loggedIn }) {
   const nights = nightsBetween(range.from, range.to);
   const ch = form.messenger === "whatsapp" ? "WhatsApp" : "Telegram";
   const step1 = lang === "ru" ? `Хозяин свяжется с вами в ${ch} перед заездом — пришлёт адрес и передаст ключи.` : lang === "uz" ? `Uy egasi kelishingizdan oldin ${ch} orqali bogʻlanadi — manzilni yuboradi va kalitlarni topshiradi.` : `Your host will contact you on ${ch} before check-in — to send the address and hand over the keys.`;
@@ -89,6 +89,13 @@ function Confirmation({ apt, range, form, lang, STR, onHome, bookingId }) {
               <p className="text-[14px] leading-relaxed text-ink/85 pt-0.5">{s}</p>
             </div>
           ))}
+          {/* anonymous bookings aren't tied to an account → warn (lost on close) + recommend signing up */}
+          {!loggedIn && (
+            <div className="flex gap-3">
+              <div className="w-7 h-7 rounded-full bg-[#F6EEDD] text-[#9A6A1E] grid place-items-center shrink-0"><Icon name="bell" size={15} /></div>
+              <p className="text-[14px] leading-relaxed text-[#7a5414] pt-0.5">{STR[lang].save_booking_warn}</p>
+            </div>
+          )}
         </div>
       </div>
 
@@ -105,7 +112,7 @@ function Confirmation({ apt, range, form, lang, STR, onHome, bookingId }) {
   );
 }
 
-export function Booking({ apt, range, lang, STR, device, onBack, onHome, onBooked }) {
+export function Booking({ apt, range, lang, STR, device, onBack, onHome, onBooked, loggedIn }) {
   const desktop = device === "desktop";
   const [step, setStep] = useState("form"); // form | otp | confirming | done
   const [form, setForm] = useState({ name: "", phone: "", tg: "", messenger: "telegram", adults: Math.min(2, apt.sleeps || 2), children: 0 });
@@ -216,7 +223,7 @@ export function Booking({ apt, range, lang, STR, device, onBack, onHome, onBooke
           <div className="mt-6"><Button full size="lg" onClick={() => setStep("form")}>{lang === "ru" ? "Назад" : lang === "uz" ? "Orqaga" : "Back"}</Button></div>
         </div>
       )}
-      {step === "done" && <Confirmation apt={apt} range={range} form={form} lang={lang} STR={STR} onHome={onHome} bookingId={bookingId} />}
+      {step === "done" && <Confirmation apt={apt} range={range} form={form} lang={lang} STR={STR} onHome={onHome} bookingId={bookingId} loggedIn={loggedIn} />}
     </>
   );
 

@@ -25,6 +25,7 @@ export function AptReserve({ apt, lang: langProp }) {
   const [range, setRange] = useState({ from: null, to: null });
   const [booking, setBooking] = useState(false);
   const [desktop, setDesktop] = useState(false);
+  const [loggedIn, setLoggedIn] = useState(false); // anonymous bookings can't be tracked in-app
   const cardRef = useRef(null);
 
   useEffect(() => {
@@ -32,6 +33,7 @@ export function AptReserve({ apt, lang: langProp }) {
     sb.rpc("busy_dates_for", { p_apartment_id: apt.id }).then(({ data }) => {
       setBusy(new Set((data || []).map((r) => r.d)));
     }).catch(() => {});
+    sb.auth.getSession().then(({ data }) => setLoggedIn(!!data.session)).catch(() => {});
   }, [apt.id]);
 
   // Match the booking overlay's layout to the screen (centered card on desktop, full-bleed on phone).
@@ -58,7 +60,7 @@ export function AptReserve({ apt, lang: langProp }) {
   if (booking) {
     return (
       <div className="fixed inset-0 z-50 bg-canvas overflow-y-auto">
-        <Booking apt={apt} range={range} lang={lang} STR={STR} device={desktop ? "desktop" : "mobile"}
+        <Booking apt={apt} range={range} lang={lang} STR={STR} device={desktop ? "desktop" : "mobile"} loggedIn={loggedIn}
           onBack={() => setBooking(false)} onHome={() => { window.location.href = "/"; }} onBooked={() => {}} />
       </div>
     );
