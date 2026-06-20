@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Manrope, Spectral } from "next/font/google";
+import { Analytics } from "@vercel/analytics/next";
 import { SITE_URL } from "@/lib/site-url";
 import "./globals.css";
 
@@ -43,7 +44,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ru" className={`${manrope.variable} ${spectral.variable} antialiased`}>
-      <body className="font-sans text-ink antialiased">{children}</body>
+      <body className="font-sans text-ink antialiased">
+        {children}
+        <Analytics />
+      </body>
     </html>
   );
 }
