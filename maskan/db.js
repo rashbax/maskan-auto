@@ -189,7 +189,8 @@ export async function getMyBookings() {
 // ---------- admin: all bookings (RLS lets an admin read every row) ----------
 export async function getAllBookings() {
   const sb = createClient();
-  const { data, error } = await sb.from("bookings").select("*").order("checkin", { ascending: true });
+  // newest first — a freshly arrived (or just-imported) booking shows at the top of the admin list
+  const { data, error } = await sb.from("bookings").select("*").order("created_at", { ascending: false });
   if (error) return [];
   return (data || []).map((b) => ({
     id: b.id,

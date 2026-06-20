@@ -128,7 +128,7 @@ function BookingRow({ b, lang, STR, onOpen, apartments }) {
     <div role={open ? "button" : undefined} tabIndex={open ? 0 : undefined}
       onClick={open} onKeyDown={open ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); } } : undefined}
       className={`flex items-center gap-3 p-3 rounded-xl border border-line bg-white ${open ? "cursor-pointer hover:bg-black/[.02] transition" : ""}`}>
-      <div className="w-11 h-11 rounded-lg overflow-hidden shrink-0"><Photo tone={apt.tone} idx={0} eager showLabel={false} className="w-full h-full" /></div>
+      <div className="w-11 h-11 rounded-lg overflow-hidden shrink-0"><Photo tone={apt.tone} idx={0} eager showLabel={false} src={apt.photoUrls?.[0]} className="w-full h-full" /></div>
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1.5 flex-wrap">
           <span className="font-bold text-[14px] truncate max-w-full">{b.guest}</span>
@@ -201,7 +201,12 @@ function BookingDetailSheet({ booking, lang, STR, desktop, apartments, onClose, 
             <span className="inline-flex items-center gap-1.5 px-2.5 h-6 rounded-full text-[11.5px] font-bold" style={{ color: st.color, background: st.bg }}><span className="w-1.5 h-1.5 rounded-full" style={{ background: st.color }} />{st.label}</span>
             <SourceTag src={b.source} lang={lang} STR={STR} />
           </div>
-          {apt && <div className="text-[13.5px] text-inksoft">{apt.title[lang]} <span className="font-mono text-inksoft/70">#{b.apt}</span></div>}
+          {apt && (
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-xl overflow-hidden shrink-0"><Photo tone={apt.tone} idx={0} eager showLabel={false} src={apt.photoUrls?.[0]} className="w-full h-full" /></div>
+              <div className="min-w-0 text-[13.5px] text-inksoft">{apt.title[lang]} <span className="font-mono text-inksoft/70">#{b.apt}</span></div>
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-3">
             <div className="rounded-xl bg-cream border border-line p-3">
               <div className="text-[10.5px] font-bold uppercase tracking-wide text-inksoft">{STR[lang].from}</div>
@@ -338,14 +343,47 @@ function EarlyCheckoutForm({ lang, STR, b, onDone }) {
 // ---- bookings list ----
 function BookingsList({ lang, STR, bookings, apartments, onChanged, onOpenDetail }) {
   const [adding, setAdding] = useState(false);
+  const [status, setStatus] = useState("all"); // all | active | cancelled | done (past + checked-out)
+  const [source, setSource] = useState("all"); // all | website | booking | manual
   const list = bookings || [];
+
+  const matchStatus = (b, s) => s === "all" || (s === "done" ? (b.status === "past" || b.status === "checked-out") : b.status === s);
+  const matchSource = (b, k) => k === "all" || b.source === k;
+  const shown = list.filter((b) => matchStatus(b, status) && matchSource(b, source));
+  // counts are contextual: each chip shows how many you'd see if you picked it (with the other filter kept)
+  const statusCount = (s) => list.filter((b) => matchSource(b, source) && matchStatus(b, s)).length;
+  const sourceCount = (k) => list.filter((b) => matchStatus(b, status) && matchSource(b, k)).length;
+
+  const statusOpts = [["all", STR[lang].a_all], ["active", STR[lang].tab_active], ["cancelled", STR[lang].tab_cancelled], ["done", STR[lang].st_completed]];
+  const sourceOpts = [["all", STR[lang].a_all, null], ["website", STR[lang].src_website, SRC.website.color], ["booking", STR[lang].src_booking, SRC.booking.color], ["manual", STR[lang].src_manual, SRC.manual.color]];
+
   return (
     <div>
-      <div className="flex justify-end mb-4"><Button icon="plusbox" onClick={() => setAdding(true)}>{lang === "ru" ? "Добавить бронь" : lang === "uz" ? "Bron qoʻshish" : "Add booking"}</Button></div>
+      <div className="flex justify-end mb-3"><Button icon="plusbox" onClick={() => setAdding(true)}>{lang === "ru" ? "Добавить бронь" : lang === "uz" ? "Bron qoʻshish" : "Add booking"}</Button></div>
+
+      {/* filters: status + source (combined with AND) */}
+      <div className="space-y-2 mb-4">
+        <div className="flex gap-2 overflow-x-auto no-scrollbar">
+          {statusOpts.map(([k, label]) => (
+            <Chip key={k} active={status === k} onClick={() => setStatus(k)}>
+              <span>{label}</span><span className="tnum text-[11px] opacity-55">{statusCount(k)}</span>
+            </Chip>
+          ))}
+        </div>
+        <div className="flex gap-2 overflow-x-auto no-scrollbar">
+          {sourceOpts.map(([k, label, color]) => (
+            <Chip key={k} active={source === k} onClick={() => setSource(k)}>
+              {color && <span className="w-1.5 h-1.5 rounded-full" style={{ background: color }} />}
+              <span>{label}</span><span className="tnum text-[11px] opacity-55">{sourceCount(k)}</span>
+            </Chip>
+          ))}
+        </div>
+      </div>
+
       <div className="space-y-2">
-        {list.length === 0
+        {shown.length === 0
           ? <div className="text-[14px] text-inksoft py-8 text-center border border-dashed border-line rounded-2xl">—</div>
-          : list.map((b) => <BookingRow key={b.id} b={b} lang={lang} STR={STR} onOpen={onOpenDetail} apartments={apartments} />)}
+          : shown.map((b) => <BookingRow key={b.id} b={b} lang={lang} STR={STR} onOpen={onOpenDetail} apartments={apartments} />)}
       </div>
       <Sheet open={adding} onClose={() => setAdding(false)} title={lang === "ru" ? "Ручная бронь" : lang === "uz" ? "Qoʻlda bron" : "Manual booking"} desktop>
         <ManualBookingForm lang={lang} STR={STR} apartments={apartments} onDone={() => { setAdding(false); onChanged && onChanged(); }} />
