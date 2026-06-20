@@ -25,7 +25,7 @@ export function dOnly(d) { return new Date(d.getFullYear(), d.getMonth(), d.getD
 
 export function nightsBetween(from, to) { return Math.round((to - from) / 86400000); }
 
-function MonthGrid({ year, month, lang, busy, from, to, hover, onPick, onHover }) {
+function MonthGrid({ year, month, lang, busy, from, to, hover, onPick, onHover, showAvailability = true }) {
   const cells = buildMonth(year, month);
   const today = dOnly(M.TODAY);
   return (
@@ -57,7 +57,7 @@ function MonthGrid({ year, month, lang, busy, from, to, hover, onPick, onHover }
               <button disabled={disabled} onClick={() => onPick(d)} onMouseEnter={() => onHover && onHover(d)}
                 className={`relative z-10 w-11 h-11 rounded-full grid place-items-center text-[14.5px] font-semibold transition-colors tnum ${isEdge ? "bg-green-700 text-cream shadow-[0_4px_12px_rgba(20,64,47,.28)]" : cls}`}>
                 {d.getDate()}
-                {!disabled && !isEdge && !inRange && (
+                {showAvailability && !disabled && !isEdge && !inRange && (
                   <span className="absolute bottom-1.5 w-1 h-1 rounded-full bg-green-600/60" />
                 )}
               </button>
@@ -69,7 +69,7 @@ function MonthGrid({ year, month, lang, busy, from, to, hover, onPick, onHover }
   );
 }
 
-export function AvailabilityCalendar({ lang, STR, busy, value, onChange, months = 1 }) {
+export function AvailabilityCalendar({ lang, STR, busy, value, onChange, months = 1, showAvailability = true }) {
   const [view, setView] = useState(() => ({ y: M.TODAY.getFullYear(), m: M.TODAY.getMonth() }));
   const [hover, setHover] = useState(null);
   const from = value?.from || null;
@@ -94,24 +94,32 @@ export function AvailabilityCalendar({ lang, STR, busy, value, onChange, months 
 
   return (
     <div>
-      {/* legend */}
-      <div className="flex items-center gap-4 mb-4 text-[12.5px] font-semibold">
-        <span className="inline-flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-green-600/60" />{STR[lang].available}</span>
-        <span className="inline-flex items-center gap-1.5 text-inksoft/70"><span className="w-3 h-0.5 bg-inksoft/40" />{STR[lang].busy}</span>
-        {from && to && (
-          <span className="ml-auto inline-flex items-center gap-1.5 text-green-700">
-            <Icon name="cal" size={14} />{STR[lang].night_n(nightsBetween(from, to))}
-          </span>
-        )}
-      </div>
+      {/* legend — the free/busy swatches only make sense where the calendar reflects ONE
+          apartment's availability (detail / reserve). The catalog filter spans all listings,
+          so it passes showAvailability={false} and the picker is a plain range selector. */}
+      {(showAvailability || (from && to)) && (
+        <div className="flex items-center gap-4 mb-4 text-[12.5px] font-semibold">
+          {showAvailability && (
+            <>
+              <span className="inline-flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-green-600/60" />{STR[lang].available}</span>
+              <span className="inline-flex items-center gap-1.5 text-inksoft/70"><span className="w-3 h-0.5 bg-inksoft/40" />{STR[lang].busy}</span>
+            </>
+          )}
+          {from && to && (
+            <span className="ml-auto inline-flex items-center gap-1.5 text-green-700">
+              <Icon name="cal" size={14} />{STR[lang].night_n(nightsBetween(from, to))}
+            </span>
+          )}
+        </div>
+      )}
       <div className="relative">
         <button onClick={() => shift(-1)} disabled={!canPrev}
           className="absolute -top-1 left-0 z-20 w-9 h-9 grid place-items-center rounded-full hover:bg-black/5 disabled:opacity-25"><Icon name="chevL" size={18} /></button>
         <button onClick={() => shift(1)}
           className="absolute -top-1 right-0 z-20 w-9 h-9 grid place-items-center rounded-full hover:bg-black/5"><Icon name="chevR" size={18} /></button>
         <div className={`grid ${months === 2 ? "grid-cols-2 gap-8" : "grid-cols-1"}`} onMouseLeave={() => setHover(null)}>
-          <MonthGrid year={view.y} month={view.m} lang={lang} busy={busy} from={from} to={to} hover={hover} onPick={pick} onHover={setHover} />
-          {months === 2 && <MonthGrid year={nextView.y} month={nextView.m} lang={lang} busy={busy} from={from} to={to} hover={hover} onPick={pick} onHover={setHover} />}
+          <MonthGrid year={view.y} month={view.m} lang={lang} busy={busy} from={from} to={to} hover={hover} onPick={pick} onHover={setHover} showAvailability={showAvailability} />
+          {months === 2 && <MonthGrid year={nextView.y} month={nextView.m} lang={lang} busy={busy} from={from} to={to} hover={hover} onPick={pick} onHover={setHover} showAvailability={showAvailability} />}
         </div>
       </div>
     </div>

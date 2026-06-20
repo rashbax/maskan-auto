@@ -93,7 +93,8 @@ function FilterControls({ lang, STR, filters, setFilters, device }) {
     <div className="space-y-7">
       <div>
         <div className="text-[12px] font-bold tracking-wide uppercase text-inksoft mb-3">{STR[lang].stay}</div>
-        <AvailabilityCalendar lang={lang} STR={STR} busy={new Set()} value={filters.range} onChange={(r) => setFilters({ ...filters, range: r })} months={device === "desktop" ? 2 : 1} />
+        {/* catalog filter spans all listings → plain range picker (no per-apartment free/busy) */}
+        <AvailabilityCalendar lang={lang} STR={STR} busy={new Set()} value={filters.range} onChange={(r) => setFilters({ ...filters, range: r })} months={device === "desktop" ? 2 : 1} showAvailability={false} />
       </div>
       <div className="flex items-center justify-between border-t border-line pt-5">
         <div>
