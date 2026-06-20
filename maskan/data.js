@@ -437,5 +437,5 @@ export const MASKAN = {
   //  - bot : login bot username; used only for APARTMENT enquiries (start=<aptId>_<lang>),
   //          where it greets by apartment name and hands off to the host.
   //  - wa  : direct WhatsApp number.
-  CONTACT: { wa: "998901234567", tg: "+998940026056", bot: "maskan_tashkentbot" },
+  CONTACT: { wa: "998940026056", tg: "+998940026056", bot: "maskan_tashkentbot" },
 };

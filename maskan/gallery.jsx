@@ -15,6 +15,12 @@ export function Gallery({ photos, name }) {
   const thumbsRef = useRef(null);
   const activeRef = useRef(0); // mirror of `active` for scroll/keyboard handlers without stale closures
 
+  // pinch + double-tap zoom (mobile) — applies to the ACTIVE slide only.
+  const [z, setZ] = useState({ s: 1, x: 0, y: 0 }); // scale + pan of the current photo
+  const [live, setLive] = useState(false);           // finger actively driving zoom/pan → no CSS transition
+  const zRef = useRef(z);
+  const gRef = useRef({});
+
   const n = photos.length;
   const isOpen = openAt !== null;
 
@@ -86,6 +92,79 @@ export function Gallery({ photos, name }) {
     return () => { window.removeEventListener("resize", onResize); window.removeEventListener("orientationchange", onResize); };
   }, [isOpen]);
 
+  useEffect(() => { zRef.current = z; }, [z]);
+  useEffect(() => { setZ({ s: 1, x: 0, y: 0 }); }, [active]); // a new photo always opens at 1x
+
+  // Pinch to zoom, drag to pan when zoomed, double-tap to toggle — on the active photo.
+  // Native non-passive listeners so we can preventDefault() to cancel the track's swipe-scroll.
+  useEffect(() => {
+    if (!isOpen) return;
+    const el = trackRef.current;
+    if (!el) return;
+    const distOf = (t) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+    const clamp = (s, x, y) => {
+      const mx = (el.clientWidth * (s - 1)) / 2, my = (el.clientHeight * (s - 1)) / 2;
+      return { x: Math.max(-mx, Math.min(mx, x)), y: Math.max(-my, Math.min(my, y)) };
+    };
+    const onStart = (e) => {
+      const t = e.touches;
+      if (t.length === 2) {
+        e.preventDefault(); setLive(true);
+        gRef.current.pinch = { d0: distOf(t), s0: zRef.current.s, x0: zRef.current.x, y0: zRef.current.y };
+        gRef.current.pan = null;
+      } else if (t.length === 1) {
+        gRef.current.pan = { x: t[0].clientX, y: t[0].clientY, sx: zRef.current.x, sy: zRef.current.y, t: Date.now(), moved: false };
+        if (zRef.current.s > 1) { e.preventDefault(); setLive(true); } // zoomed → we own the drag (pan)
+      }
+    };
+    const onMove = (e) => {
+      const t = e.touches;
+      if (gRef.current.pinch && t.length === 2) {
+        e.preventDefault();
+        const p = gRef.current.pinch;
+        const s = Math.max(1, Math.min(4, p.s0 * (distOf(t) / p.d0)));
+        const c = clamp(s, p.x0, p.y0);
+        setZ({ s, x: c.x, y: c.y });
+      } else if (gRef.current.pan && t.length === 1) {
+        const p = gRef.current.pan;
+        const dx = t[0].clientX - p.x, dy = t[0].clientY - p.y;
+        if (Math.abs(dx) > 4 || Math.abs(dy) > 4) p.moved = true;
+        if (zRef.current.s > 1) { // pan the zoomed photo (and keep the track from swiping)
+          e.preventDefault();
+          const c = clamp(zRef.current.s, p.sx + dx, p.sy + dy);
+          setZ((cur) => ({ ...cur, x: c.x, y: c.y }));
+        }
+        // at 1x we don't preventDefault → the native scroll-snap handles the swipe
+      }
+    };
+    const onEnd = (e) => {
+      if (gRef.current.pinch && e.touches.length < 2) {
+        gRef.current.pinch = null; setLive(false);
+        if (zRef.current.s <= 1.03) setZ({ s: 1, x: 0, y: 0 });
+      }
+      if (gRef.current.pan && e.touches.length === 0) {
+        const p = gRef.current.pan, now = Date.now();
+        if (!p.moved && now - p.t < 250) { // a tap → maybe the second half of a double-tap
+          if (gRef.current.lastTap && now - gRef.current.lastTap < 300) {
+            setLive(false);
+            setZ(zRef.current.s > 1 ? { s: 1, x: 0, y: 0 } : { s: 2.5, x: 0, y: 0 });
+            gRef.current.lastTap = 0;
+          } else gRef.current.lastTap = now;
+        }
+        gRef.current.pan = null;
+        if (zRef.current.s <= 1) setLive(false);
+      }
+    };
+    el.addEventListener("touchstart", onStart, { passive: false });
+    el.addEventListener("touchmove", onMove, { passive: false });
+    el.addEventListener("touchend", onEnd, { passive: false });
+    return () => {
+      el.removeEventListener("touchstart", onStart);
+      el.removeEventListener("touchmove", onMove);
+      el.removeEventListener("touchend", onEnd);
+    };
+  }, [isOpen]);
+
   if (!n) return null;
 
   // Windowed dots (mobile): ~7 around the active one so long galleries don't overflow.
@@ -118,6 +197,7 @@ export function Gallery({ photos, name }) {
           <div
             ref={trackRef}
             onScroll={onScroll}
+            style={{ touchAction: z.s > 1 ? "none" : undefined }}
             className="no-scrollbar absolute inset-0 flex overflow-x-auto overflow-y-hidden snap-x snap-mandatory overscroll-contain touch-pan-x"
           >
             {photos.map((u, k) => (
@@ -128,6 +208,7 @@ export function Gallery({ photos, name }) {
                   alt={`${name} — ${k + 1}`}
                   loading={Math.abs(k - active) <= 1 ? "eager" : "lazy"}
                   draggable={false}
+                  style={k === active ? { transform: `translate3d(${z.x}px, ${z.y}px, 0) scale(${z.s})`, transition: live ? "none" : "transform .18s ease-out", willChange: "transform" } : undefined}
                   className="max-h-[88vh] max-w-[94vw] object-contain select-none"
                 />
               </div>
