@@ -184,7 +184,14 @@ export function Booking({ apt, range, lang, STR, device, onBack, onHome, onBooke
               <input className={inputCls} placeholder={STR[lang].name_ph} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
             </Field>
             <Field label={STR[lang].phone} help={STR[lang].phone_help} error={errs.phone && (lang === "ru" ? "неверный номер" : lang === "uz" ? "notoʻgʻri raqam" : "invalid number")}>
-              <input className={inputCls} inputMode="tel" placeholder="+998 90 123 45 67" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+              {/* fixed "+" prefix so guests can't forget it; a bare 9-digit UZ mobile gets +998 on blur */}
+              <div className="relative">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-inksoft font-semibold pointer-events-none">+</span>
+                <input className={inputCls + " pl-8"} inputMode="tel" placeholder="998 90 123 45 67"
+                  value={form.phone.replace(/^\+/, "")}
+                  onChange={(e) => setForm({ ...form, phone: "+" + e.target.value.replace(/[^\d\s\-()]/g, "") })}
+                  onBlur={() => setForm((f) => { const d = f.phone.replace(/\D/g, ""); return d.length === 9 ? { ...f, phone: "+998" + d } : f; })} />
+              </div>
             </Field>
             <div>
               <div className="text-[13px] font-bold text-ink mb-1.5">{STR[lang].pref_messenger}</div>

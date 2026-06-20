@@ -270,7 +270,7 @@ function ManualBookingForm({ lang, STR, apartments, onDone }) {
     <div className="space-y-4 pb-2">
       <label className="block"><span className="text-[13px] font-bold">{T("Квартира", "Kvartira", "Apartment")}</span>
         <select value={aptId} onChange={(e) => setAptId(e.target.value)} className={fld}>
-          {apts.map((a) => <option key={a.id} value={a.id}>{a.title[lang]}</option>)}
+          {apts.map((a) => <option key={a.id} value={a.id}>{a.id} · {a.title[lang]}</option>)}
         </select></label>
       <div className="grid grid-cols-2 gap-3">
         <label className="block"><span className="text-[13px] font-bold">{STR[lang].checkin}</span><input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className={fld} /></label>
