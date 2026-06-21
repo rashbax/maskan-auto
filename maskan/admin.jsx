@@ -342,41 +342,58 @@ function EarlyCheckoutForm({ lang, STR, b, onDone }) {
 
 // ---- bookings list ----
 function BookingsList({ lang, STR, bookings, apartments, onChanged, onOpenDetail }) {
+  const T = (ru, uz, en) => (lang === "ru" ? ru : lang === "uz" ? uz : en);
   const [adding, setAdding] = useState(false);
-  const [status, setStatus] = useState("all"); // all | active | cancelled | done (past + checked-out)
-  const [source, setSource] = useState("all"); // all | website | booking | manual
+  const [status, setStatus] = useState("active"); // default: just active bookings (keeps the list short)
+  const [source, setSource] = useState("all");     // all | website | booking | manual
+  const [query, setQuery] = useState("");
+  const [limit, setLimit] = useState(25);           // grow via "show more" so the page never gets huge
   const list = bookings || [];
 
+  const aptTitle = (id) => { const a = (apartments || []).find((x) => x.id === id); return a ? a.title[lang] : ""; };
   const matchStatus = (b, s) => s === "all" || (s === "done" ? (b.status === "past" || b.status === "checked-out") : b.status === s);
   const matchSource = (b, k) => k === "all" || b.source === k;
-  const shown = list.filter((b) => matchStatus(b, status) && matchSource(b, source));
-  // counts are contextual: each chip shows how many you'd see if you picked it (with the other filter kept)
-  const statusCount = (s) => list.filter((b) => matchSource(b, source) && matchStatus(b, s)).length;
-  const sourceCount = (k) => list.filter((b) => matchStatus(b, status) && matchSource(b, k)).length;
+  const q = query.trim().toLowerCase();
+  const matchQuery = (b) => !q || [b.guest, b.id, b.phone, aptTitle(b.apt)].some((v) => (v || "").toLowerCase().includes(q));
+  const filtered = list.filter((b) => matchStatus(b, status) && matchSource(b, source) && matchQuery(b));
+  const shown = filtered.slice(0, limit);
+  // counts stay contextual to the other dimensions + the search
+  const statusCount = (s) => list.filter((b) => matchSource(b, source) && matchQuery(b) && matchStatus(b, s)).length;
+  const sourceCount = (k) => list.filter((b) => matchStatus(b, status) && matchQuery(b) && matchSource(b, k)).length;
+  useEffect(() => { setLimit(25); }, [status, source, query]); // a new filter/search resets the window
 
   const statusOpts = [["all", STR[lang].a_all], ["active", STR[lang].tab_active], ["cancelled", STR[lang].tab_cancelled], ["done", STR[lang].st_completed]];
   const sourceOpts = [["all", STR[lang].a_all, null], ["website", STR[lang].src_website, SRC.website.color], ["booking", STR[lang].src_booking, SRC.booking.color], ["manual", STR[lang].src_manual, SRC.manual.color]];
 
   return (
     <div>
-      <div className="flex justify-end mb-3"><Button icon="plusbox" onClick={() => setAdding(true)}>{lang === "ru" ? "Добавить бронь" : lang === "uz" ? "Bron qoʻshish" : "Add booking"}</Button></div>
-
-      {/* filters: status + source (combined with AND) */}
-      <div className="space-y-2 mb-4">
-        <div className="flex gap-2 overflow-x-auto no-scrollbar">
-          {statusOpts.map(([k, label]) => (
-            <Chip key={k} active={status === k} onClick={() => setStatus(k)}>
-              <span>{label}</span><span className="tnum text-[11px] opacity-55">{statusCount(k)}</span>
-            </Chip>
-          ))}
+      {/* sticky controls: search + add, then status / source filter rows */}
+      <div className="sticky top-0 z-20 bg-canvas pt-1 pb-3">
+        <div className="flex items-center gap-2 mb-2">
+          <div className="relative flex-1 min-w-0">
+            <Icon name="search" size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-inksoft pointer-events-none" />
+            <input value={query} onChange={(e) => setQuery(e.target.value)}
+              placeholder={T("Поиск: гость, №, квартира, телефон", "Qidiruv: mehmon, №, kvartira, telefon", "Search: guest, no., apartment, phone")}
+              className="w-full h-11 pl-9 pr-3 rounded-xl bg-white border border-line outline-none focus:border-green-600 focus:ring-2 focus:ring-green-600/15 transition text-[14px]" />
+          </div>
+          <Button icon="plusbox" onClick={() => setAdding(true)} className="shrink-0">{T("Добавить", "Qoʻshish", "Add")}</Button>
         </div>
-        <div className="flex gap-2 overflow-x-auto no-scrollbar">
-          {sourceOpts.map(([k, label, color]) => (
-            <Chip key={k} active={source === k} onClick={() => setSource(k)}>
-              {color && <span className="w-1.5 h-1.5 rounded-full" style={{ background: color }} />}
-              <span>{label}</span><span className="tnum text-[11px] opacity-55">{sourceCount(k)}</span>
-            </Chip>
-          ))}
+        <div className="space-y-2">
+          <div className="flex gap-2 overflow-x-auto no-scrollbar">
+            {statusOpts.map(([k, label]) => (
+              <Chip key={k} active={status === k} onClick={() => setStatus(k)}>
+                <span>{label}</span><span className="tnum text-[11px] opacity-55">{statusCount(k)}</span>
+              </Chip>
+            ))}
+          </div>
+          <div className="flex gap-2 overflow-x-auto no-scrollbar">
+            {sourceOpts.map(([k, label, color]) => (
+              <Chip key={k} active={source === k} onClick={() => setSource(k)}>
+                {color && <span className="w-1.5 h-1.5 rounded-full" style={{ background: color }} />}
+                <span>{label}</span><span className="tnum text-[11px] opacity-55">{sourceCount(k)}</span>
+              </Chip>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -385,6 +402,11 @@ function BookingsList({ lang, STR, bookings, apartments, onChanged, onOpenDetail
           ? <div className="text-[14px] text-inksoft py-8 text-center border border-dashed border-line rounded-2xl">—</div>
           : shown.map((b) => <BookingRow key={b.id} b={b} lang={lang} STR={STR} onOpen={onOpenDetail} apartments={apartments} />)}
       </div>
+      {filtered.length > shown.length && (
+        <div className="mt-4 flex justify-center">
+          <Button variant="outline" onClick={() => setLimit((l) => l + 25)}>{T("Показать ещё", "Yana koʻrsatish", "Show more")} ({filtered.length - shown.length})</Button>
+        </div>
+      )}
       <Sheet open={adding} onClose={() => setAdding(false)} title={lang === "ru" ? "Ручная бронь" : lang === "uz" ? "Qoʻlda bron" : "Manual booking"} desktop>
         <ManualBookingForm lang={lang} STR={STR} apartments={apartments} onDone={() => { setAdding(false); onChanged && onChanged(); }} />
       </Sheet>
