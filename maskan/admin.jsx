@@ -1013,7 +1013,7 @@ export function Admin({ lang, STR, device, onExit, openLang, role, auth, onLogin
   const titles = { dash: STR[lang].a_dashboard, list: STR[lang].a_listings, cal: STR[lang].a_calendar, book: STR[lang].a_bookings, reviews: STR[lang].a_moderate, pfile: STR[lang].a_pfile, suppliers: STR[lang].a_suppliers };
 
   return (
-    <div className="min-h-screen bg-canvas flex relative">
+    <div className="h-[100dvh] overflow-hidden bg-canvas flex relative">
       {/* sidebar (desktop only — driven by the device prop, not md:) */}
       {desktop && (
         <aside className="flex w-60 shrink-0 flex-col border-r border-line bg-white px-4 py-5">
@@ -1029,7 +1029,7 @@ export function Admin({ lang, STR, device, onExit, openLang, role, auth, onLogin
         </aside>
       )}
 
-      <div className="flex-1 min-w-0 flex flex-col">
+      <div className="flex-1 min-w-0 flex flex-col min-h-0">
         <header className={`sticky top-0 z-20 bg-canvas/92 backdrop-blur border-b border-line ${desktop ? "px-8" : "px-5"}`}>
           <div className="flex items-center justify-between h-16">
             <h1 className="font-serif text-[22px]">{editId ? STR[lang].a_edit : titles[tab]}</h1>
@@ -1042,7 +1042,7 @@ export function Admin({ lang, STR, device, onExit, openLang, role, auth, onLogin
             </div>
           )}
         </header>
-        <main className={`flex-1 ${desktop ? "px-8" : "px-5"} py-6 overflow-y-auto no-scrollbar`}>
+        <main className={`flex-1 min-h-0 ${desktop ? "px-8" : "px-5"} py-6 overflow-y-auto no-scrollbar`}>
           {editId ? <EditApt lang={lang} STR={STR} id={editId} onBack={() => window.history.back()} apartments={apts} onSaved={() => getApartments().then(setApts)} />
             : tab === "dash" ? <Dashboard lang={lang} STR={STR} bookings={bookings} apartments={apts} onOpenDetail={setDetail} />
             : tab === "list" ? <Listings lang={lang} STR={STR} onEdit={goEdit} apartments={apts} />
