@@ -244,12 +244,13 @@ function ManualBookingForm({ lang, STR, apartments, onDone }) {
   const [guest, setGuest] = useState("");
   const [phone, setPhone] = useState("");
   const [source, setSource] = useState("manual");
-  const [total, setTotal] = useState("");
+  const [nightly, setNightly] = useState(""); // PER-NIGHT price (blank = use the listing's nightly)
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const apt = apts.find((a) => a.id === aptId);
   const nights = from && to ? Math.round((new Date(to) - new Date(from)) / 86400000) : 0;
-  const suggested = apt && nights > 0 ? apt.price * nights : 0;
+  const price = nightly !== "" ? +nightly : (apt?.price || 0); // per night
+  const total = nights > 0 ? price * nights : 0;               // total_usd = per night × nights
   const fld = "mt-1.5 w-full h-12 px-4 rounded-xl bg-white border border-line outline-none focus:border-green-600 focus:ring-2 focus:ring-green-600/15 transition text-[15px]";
   const T = (ru, uz, en) => (lang === "ru" ? ru : lang === "uz" ? uz : en);
   const msgs = { required: T("Заполните квартиру и даты", "Kvartira va sanalarni toʻldiring", "Fill apartment and dates"), dates: T("Выезд должен быть позже заезда", "Ketish kelishdan keyin boʻlsin", "Check-out must be after check-in"), overlap: T("Эти даты уже заняты", "Bu sanalar allaqachon band", "These dates are already taken"), fail: T("Не удалось", "Boʻlmadi", "Failed") };
@@ -259,7 +260,7 @@ function ManualBookingForm({ lang, STR, apartments, onDone }) {
     if (nights <= 0) { setErr("dates"); return; }
     setBusy(true);
     try {
-      await createManualBooking({ apartmentId: aptId, guestName: guest, phone, from, to, total: total ? +total : suggested, source });
+      await createManualBooking({ apartmentId: aptId, guestName: guest, phone, from, to, total, source });
       onDone();
     } catch (e) {
       setBusy(false);
@@ -277,7 +278,13 @@ function ManualBookingForm({ lang, STR, apartments, onDone }) {
         <label className="block"><span className="text-[13px] font-bold">{STR[lang].checkout}</span><input type="date" value={to} onChange={(e) => setTo(e.target.value)} className={fld} /></label>
       </div>
       <label className="block"><span className="text-[13px] font-bold">{STR[lang].a_guest}</span><input value={guest} onChange={(e) => setGuest(e.target.value)} placeholder={STR[lang].name_ph} className={fld} /></label>
-      <label className="block"><span className="text-[13px] font-bold">{STR[lang].phone}</span><input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+998 ..." className={fld} /></label>
+      <label className="block"><span className="text-[13px] font-bold">{STR[lang].phone}</span>
+        <div className="relative">
+          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-inksoft font-semibold pointer-events-none">+</span>
+          <input value={phone.replace(/^\+/, "")} inputMode="tel" placeholder="998 90 123 45 67" className={fld + " pl-8"}
+            onChange={(e) => setPhone("+" + e.target.value.replace(/[^\d\s\-()]/g, ""))}
+            onBlur={() => setPhone((p) => { const d = p.replace(/\D/g, ""); return d.length === 9 ? "+998" + d : p; })} />
+        </div></label>
       <div>
         <span className="text-[13px] font-bold">{STR[lang].a_source}</span>
         <div className="grid grid-cols-2 gap-2.5 mt-1.5">
@@ -289,8 +296,8 @@ function ManualBookingForm({ lang, STR, apartments, onDone }) {
         </div>
       </div>
       <label className="block"><span className="text-[13px] font-bold">{STR[lang].a_price} ($)</span>
-        <input type="number" value={total} onChange={(e) => setTotal(e.target.value)} placeholder={suggested ? String(suggested) : "0"} className={fld + " tnum"} />
-        {nights > 0 && <div className="text-[12px] text-inksoft mt-1.5">{STR[lang].night_n(nights)} · {T("предложено", "taklif", "suggested")}: ${suggested}</div>}
+        <input type="number" value={nightly} onChange={(e) => setNightly(e.target.value)} placeholder={apt ? String(apt.price) : "0"} className={fld + " tnum"} />
+        {nights > 0 && <div className="text-[12px] text-inksoft mt-1.5">${price} × {STR[lang].night_n(nights)} = <b className="text-ink tnum">${total}</b></div>}
       </label>
       {err && <div className="text-[13px] text-[#9a4a3c] bg-red-50 rounded-lg p-3">{msgs[err]}</div>}
       <Button full size="lg" icon="check" onClick={submit} disabled={busy} className={busy ? "opacity-60 pointer-events-none" : ""}>{busy ? "…" : T("Добавить бронь", "Bron qoʻshish", "Add booking")}</Button>
