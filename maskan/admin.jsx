@@ -374,8 +374,10 @@ function BookingsList({ lang, STR, bookings, apartments, onChanged, onOpenDetail
 
   return (
     <div>
-      {/* sticky controls: search + add, then status / source filter rows */}
-      <div className="sticky top-0 z-20 bg-canvas pt-1 pb-3">
+      {/* sticky controls: search + add, then status / source filter rows.
+          before: a canvas block extends the background up over main's pt-6, so rows
+          can't peek through the gap above the bar when it's pinned. */}
+      <div className="sticky top-0 z-20 bg-canvas pt-1 pb-3 before:content-[''] before:absolute before:inset-x-0 before:bottom-full before:h-8 before:bg-canvas">
         <div className="flex items-center gap-2 mb-2">
           <div className="relative flex-1 min-w-0">
             <Icon name="search" size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-inksoft pointer-events-none" />
