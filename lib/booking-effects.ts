@@ -64,13 +64,17 @@ export async function notifyOwner(id: string) {
   }
 }
 
-// Mirror our own active website booking into Beds24 so the dates close on connected OTAs.
+// Bookings that originate in Maskan (the website + admin-entered manual ones) and so must be
+// mirrored OUT to Beds24. OTA-origin ("booking") rows are owned by the channel — never push them back.
+const OWNED_SOURCES = ["website", "manual"];
+
+// Mirror one of our own active bookings into Beds24 so the dates close on connected OTAs.
 export async function pushToBeds24(id: string) {
   if (!beds24Enabled()) return;
   const sb = createAdminClient();
   const { data: b } = await sb.from("bookings").select("*").eq("id", id).single();
   if (!b || b.beds24_booking_id) return;
-  if (b.source !== "website" || b.status !== "active") return;
+  if (!OWNED_SOURCES.includes(b.source) || b.status !== "active") return;
 
   const { data: apt } = await sb
     .from("apartments")
@@ -111,14 +115,14 @@ export async function pushToBeds24(id: string) {
   }
 }
 
-// Cancel the Beds24 mirror for bookings that originated on our website. OTA-origin bookings should
-// be cancelled in the OTA/Beds24 first, then pulled back into Maskan.
+// Cancel the Beds24 mirror for bookings that originated in Maskan (website + manual). OTA-origin
+// bookings should be cancelled in the OTA/Beds24 first, then pulled back into Maskan.
 export async function cancelInBeds24(id: string) {
   if (!beds24Enabled()) return { ok: true, skipped: "beds24_not_configured" };
   const sb = createAdminClient();
   const { data: b } = await sb.from("bookings").select("*").eq("id", id).single();
   if (!b) return { ok: false, error: "booking_not_found" };
-  if (b.source !== "website") return { ok: true, skipped: "not_website_source" };
+  if (!OWNED_SOURCES.includes(b.source)) return { ok: true, skipped: "not_owned_source" };
   if (!b.beds24_booking_id) return { ok: true, skipped: "no_beds24_booking_id" };
 
   const { data: apt } = await sb
@@ -283,7 +287,7 @@ export async function shortenInBeds24(id: string, newCheckout: string) {
   const sb = createAdminClient();
   const { data: b } = await sb.from("bookings").select("*").eq("id", id).single();
   if (!b) return { ok: false, error: "booking_not_found" };
-  if (b.source !== "website") return { ok: true, skipped: "not_website_source" };
+  if (!OWNED_SOURCES.includes(b.source)) return { ok: true, skipped: "not_owned_source" };
   if (!b.beds24_booking_id) return { ok: true, skipped: "no_beds24_booking_id" };
 
   const { data: apt } = await sb

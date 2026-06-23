@@ -39,7 +39,7 @@ export async function GET(req: Request) {
     ? await sb
         .from("bookings")
         .select("id, apartments!inner(beds24_room_id)")
-        .eq("source", "website").eq("status", "active")
+        .in("source", ["website", "manual"]).eq("status", "active")
         .is("beds24_booking_id", null).not("apartments.beds24_room_id", "is", null)
         .gte("created_at", since).order("created_at", { ascending: true }).limit(25)
     : { data: [] as { id: string }[], error: null };

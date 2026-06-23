@@ -428,8 +428,13 @@ export async function syncBeds24Bookings(opts: { from?: string; to?: string; boo
 
     if (existing) {
       const e = existing as ExistingBooking;
-      const guestFields = e.source === "website" ? {} : otaFields;
-      const next = { ...base, ...guestFields };
+      // Bookings authored in Maskan (website + manual) treat Beds24 as a downstream mirror: reflect
+      // date/status changes but never let the OTA payload clobber the locally-entered guest info or
+      // price (the Beds24 total is in the channel's own currency; the manual total is admin-set).
+      const owned = e.source === "website" || e.source === "manual";
+      const guestFields = owned ? {} : otaFields;
+      const priceField = owned ? { total_usd: e.total_usd } : {};
+      const next = { ...base, ...priceField, ...guestFields };
       const keys = Object.keys(next) as (keyof ExistingBooking)[];
       if (!changed(e, next, keys)) {
         unchanged++;
