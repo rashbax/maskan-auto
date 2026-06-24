@@ -5,6 +5,7 @@ import { Icon, Logo, Button, Photo, ChannelBtn, Stepper } from "./ui";
 import { nightsBetween } from "./calendar";
 import { fmtRange } from "./catalog";
 import { createBooking } from "./db";
+import { fmtPrice } from "./money";
 
 function Field({ label, help, error, children }) {
   return (
@@ -21,7 +22,7 @@ function Field({ label, help, error, children }) {
 
 const inputCls = "w-full h-13 px-4 rounded-xl bg-white border border-line text-[15px] outline-none focus:border-green-600 focus:ring-2 focus:ring-green-600/15 transition placeholder:text-inksoft/50";
 
-function SummaryStrip({ apt, range, lang, STR }) {
+function SummaryStrip({ apt, range, lang, STR, currency, rates }) {
   const nights = nightsBetween(range.from, range.to);
   return (
     <div className="flex items-center gap-3 p-3 rounded-2xl bg-white border border-line">
@@ -30,7 +31,7 @@ function SummaryStrip({ apt, range, lang, STR }) {
         <div className="font-serif text-[15px] leading-snug truncate">{apt.title[lang]}</div>
         <div className="text-[12.5px] text-inksoft mt-0.5">{fmtRange(range.from, range.to, lang)} · {STR[lang].night_n(nights)}</div>
       </div>
-      <div className="text-right shrink-0"><div className="font-bold text-[17px] tnum">${apt.price * nights}</div><div className="text-[11px] text-green-700 font-semibold">{STR[lang].nofees}</div></div>
+      <div className="text-right shrink-0"><div className="font-bold text-[17px] tnum">{fmtPrice(apt.price * nights, currency, rates)}</div><div className="text-[11px] text-green-700 font-semibold">{STR[lang].nofees}</div></div>
     </div>
   );
 }
@@ -65,7 +66,7 @@ function OtpStep({ lang, STR, phone, onDone, onSkip }) {
 }
 
 // ---- confirmation ----
-function Confirmation({ apt, range, form, lang, STR, onHome, bookingId, loggedIn }) {
+function Confirmation({ apt, range, form, lang, STR, onHome, bookingId, loggedIn, currency, rates }) {
   const nights = nightsBetween(range.from, range.to);
   const ch = form.messenger === "whatsapp" ? "WhatsApp" : "Telegram";
   const step1 = lang === "ru" ? `Хозяин свяжется с вами в ${ch} перед заездом — пришлёт адрес и передаст ключи.` : lang === "uz" ? `Uy egasi kelishingizdan oldin ${ch} orqali bogʻlanadi — manzilni yuboradi va kalitlarni topshiradi.` : `Your host will contact you on ${ch} before check-in — to send the address and hand over the keys.`;
@@ -78,7 +79,7 @@ function Confirmation({ apt, range, form, lang, STR, onHome, bookingId, loggedIn
         <p className="text-inksoft text-[14px] mt-1.5 tnum">{STR[lang].booking_no} <b className="text-ink">{bookingId}</b></p>
       </div>
 
-      <div className="mt-6"><SummaryStrip apt={apt} range={range} lang={lang} STR={STR} /></div>
+      <div className="mt-6"><SummaryStrip apt={apt} range={range} lang={lang} STR={STR} currency={currency} rates={rates} /></div>
 
       <div className="mt-6">
         <h2 className="font-serif text-[19px] mb-3">{STR[lang].whatsnext}</h2>
@@ -112,7 +113,7 @@ function Confirmation({ apt, range, form, lang, STR, onHome, bookingId, loggedIn
   );
 }
 
-export function Booking({ apt, range, lang, STR, device, onBack, onHome, onBooked, loggedIn }) {
+export function Booking({ apt, range, lang, STR, device, onBack, onHome, onBooked, loggedIn, currency, rates }) {
   const desktop = device === "desktop";
   const [step, setStep] = useState("form"); // form | otp | confirming | done
   const [form, setForm] = useState({ name: "", phone: "", tg: "", messenger: "telegram", adults: Math.min(2, apt.sleeps || 2), children: 0 });
@@ -165,7 +166,7 @@ export function Booking({ apt, range, lang, STR, device, onBack, onHome, onBooke
     <>
       {step === "form" && (
         <div className="fade-up">
-          <SummaryStrip apt={apt} range={range} lang={lang} STR={STR} />
+          <SummaryStrip apt={apt} range={range} lang={lang} STR={STR} currency={currency} rates={rates} />
           <h2 className="font-serif text-[22px] mt-6 mb-1">{STR[lang].reserve_title}</h2>
           <p className="text-[13.5px] text-inksoft mb-5">{lang === "ru" ? "Две детали — и квартира ваша." : lang === "uz" ? "Ikkita maʼlumot — va kvartira sizniki." : "Two details and the place is yours."}</p>
           <div className="space-y-4">
@@ -230,7 +231,7 @@ export function Booking({ apt, range, lang, STR, device, onBack, onHome, onBooke
           <div className="mt-6"><Button full size="lg" onClick={() => setStep("form")}>{lang === "ru" ? "Назад" : lang === "uz" ? "Orqaga" : "Back"}</Button></div>
         </div>
       )}
-      {step === "done" && <Confirmation apt={apt} range={range} form={form} lang={lang} STR={STR} onHome={onHome} bookingId={bookingId} loggedIn={loggedIn} />}
+      {step === "done" && <Confirmation apt={apt} range={range} form={form} lang={lang} STR={STR} onHome={onHome} bookingId={bookingId} loggedIn={loggedIn} currency={currency} rates={rates} />}
     </>
   );
 
@@ -251,7 +252,7 @@ export function Booking({ apt, range, lang, STR, device, onBack, onHome, onBooke
       {step === "form" && (
         <div className="sticky bottom-0 bg-white border-t border-line shadow-bar px-4 py-3">
           <div className={`${desktop ? "max-w-lg mx-auto" : ""}`}>
-            <Button full size="lg" icon="bolt" onClick={submit}><span className="whitespace-nowrap">{STR[lang].confirm_book} · ${apt.price * nightsBetween(range.from, range.to)}</span></Button>
+            <Button full size="lg" icon="bolt" onClick={submit}><span className="whitespace-nowrap">{STR[lang].confirm_book} · {fmtPrice(apt.price * nightsBetween(range.from, range.to), currency, rates)}</span></Button>
           </div>
         </div>
       )}

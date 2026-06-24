@@ -6,8 +6,9 @@ import { Icon, Sheet } from "./ui";
 import { Catalog } from "./catalog";
 import { SavedPage, BookingsPage, AccountPage, BottomNav } from "./account";
 import { Admin } from "./admin";
-import { getApartments, getFavorites, getMyBookings, addFavorite, removeFavorite, getMyRole } from "./db";
+import { getApartments, getFavorites, getMyBookings, addFavorite, removeFavorite, getMyRole, getRates, RATE_FALLBACK } from "./db";
 import { sb, mapUser, signInWithGoogle, signOut } from "./auth";
+import { CURRENCY_CODES, defaultCurrencyFor } from "./money";
 
 const LANGS = ["uz", "ru", "en"];
 const DESKTOP_MIN_WIDTH = 760;
@@ -50,6 +51,11 @@ export default function App() {
     const saved = typeof window !== "undefined" ? localStorage.getItem("maskan_lang") : null;
     return ["uz", "ru", "en"].includes(saved) ? saved : "ru"; // first visit defaults to Russian
   });
+  const [currency, setCurrency] = useState(() => {
+    const saved = typeof window !== "undefined" ? localStorage.getItem("maskan_currency") : null;
+    return CURRENCY_CODES.includes(saved) ? saved : defaultCurrencyFor(lang);
+  });
+  const [rates, setRates] = useState(RATE_FALLBACK); // per_usd; replaced by live CBU rates on load
   const [device, setDevice] = useState(getDeviceMode);
   const [route, setRoute] = useState({ screen: "catalog" });
   const [filters, setFilters] = useState({ range: { from: null, to: null }, guests: 2, district: null });
@@ -70,6 +76,9 @@ export default function App() {
 
   // remember the chosen language across refreshes
   useEffect(() => { try { localStorage.setItem("maskan_lang", lang); } catch { /* ignore */ } }, [lang]);
+  // remember the chosen display currency; load live FX rates once
+  useEffect(() => { try { localStorage.setItem("maskan_currency", currency); } catch { /* ignore */ } }, [currency]);
+  useEffect(() => { getRates().then(setRates).catch(() => {}); }, []);
 
   // Complete the Telegram bot-nonce login: the magic link redirects back with the session
   // tokens in the URL fragment (#access_token=…). The PKCE browser client ignores that, so
@@ -154,7 +163,7 @@ export default function App() {
   const navTab = route.screen === "catalog" ? "search" : route.screen;
   const setTab = (key) => { key === "search" ? goCatalog() : go({ screen: key }); };
 
-  const common = { lang, STR, device, openLang, tab: navTab, setTab };
+  const common = { lang, STR, device, openLang, tab: navTab, setTab, currency, setCurrency, rates };
   let screen;
   if (route.screen === "catalog") screen = <Catalog {...common} apartments={apartments} filters={filters} setFilters={setFilters} onOpen={openApt} saved={saved} toggleSave={toggleSave} />;
   else if (route.screen === "saved") screen = <SavedPage {...common} apartments={apartments} saved={saved} toggleSave={toggleSave} onOpen={openApt} auth={auth} onLogin={login} />;

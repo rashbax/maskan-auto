@@ -77,6 +77,17 @@ export async function getApartments() {
   }));
 }
 
+// ---------- multi-currency display: FX rates (public read; USD canonical) ----------
+// per_usd = units of currency C per 1 USD. price_in_C = price_usd × per_usd[C].
+// Refreshed daily from CBU (lib/rates.ts via the beds24-pull cron). Display-only.
+export const RATE_FALLBACK = { USD: 1, UZS: 12650, RUB: 90, KZT: 480, KGS: 87 };
+export async function getRates() {
+  const sb = createClient();
+  const { data, error } = await sb.from("exchange_rates").select("per_usd").eq("id", 1).single();
+  if (error || !data?.per_usd) return RATE_FALLBACK;
+  return { ...RATE_FALLBACK, ...data.per_usd }; // keep every currency key present
+}
+
 // ---------- admin: photo upload (presigned R2) ----------
 export async function requestUploadUrl(apartmentId, contentType) {
   const res = await fetch("/api/upload-url", {

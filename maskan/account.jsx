@@ -1,8 +1,9 @@
 "use client";
 import { useState } from "react";
-import { Icon, Logo, Button, Photo, GoogleG, tgHref } from "./ui";
+import { Icon, Logo, Button, Photo, GoogleG, tgHref, CurrencyMenu } from "./ui";
 import { TelegramLoginButton } from "./telegram-button";
 import { AptCard, StateBlock, fmtRange } from "./catalog";
+import { fmtPrice } from "./money";
 
 export const NAV = [
   { key: "search", icon: "search" },
@@ -45,7 +46,7 @@ export function BottomNav({ tab, setTab, lang, STR }) {
 }
 
 // ---------- page shell (for saved/bookings/account) ----------
-function PageShell({ lang, STR, device, tab, setTab, openLang, title, children }) {
+function PageShell({ lang, STR, device, tab, setTab, openLang, title, children, currency, setCurrency }) {
   const desktop = device === "desktop";
   return (
     <div className="min-h-screen bg-canvas">
@@ -53,8 +54,11 @@ function PageShell({ lang, STR, device, tab, setTab, openLang, title, children }
         <div className={`flex items-center justify-between ${desktop ? "h-[68px] max-w-5xl mx-auto" : "h-14"}`}>
           {desktop ? <Logo size={30} /> : <h1 className="font-serif text-[20px]">{title}</h1>}
           {desktop && <NavLinks tab={tab} setTab={setTab} lang={lang} STR={STR} />}
-          <button onClick={openLang} className="inline-flex items-center gap-1.5 h-9 px-3 rounded-full border border-line text-[13px] font-bold hover:border-ink/30 transition">
-            <Icon name="globe" size={16} />{STR[lang].code}</button>
+          <div className="flex items-center gap-1.5">
+            <CurrencyMenu currency={currency} setCurrency={setCurrency} lang={lang} />
+            <button onClick={openLang} className="inline-flex items-center gap-1.5 h-9 px-3 rounded-full border border-line text-[13px] font-bold hover:border-ink/30 transition">
+              <Icon name="globe" size={16} />{STR[lang].code}</button>
+          </div>
         </div>
       </header>
       <div className={`${desktop ? "max-w-5xl mx-auto px-8 py-8" : "px-4 pt-4 pb-[88px]"}`}>
@@ -88,14 +92,14 @@ export function GuestGate({ lang, STR, onLogin }) {
 }
 
 // ---------- Saved ----------
-export function SavedPage({ lang, STR, device, tab, setTab, openLang, saved, toggleSave, onOpen, auth, onLogin, apartments }) {
+export function SavedPage({ lang, STR, device, tab, setTab, openLang, saved, toggleSave, onOpen, auth, onLogin, apartments, currency, setCurrency, rates }) {
   const apts = (apartments || []).filter((a) => saved.has(a.id));
   return (
-    <PageShell lang={lang} STR={STR} device={device} tab={tab} setTab={setTab} openLang={openLang} title={STR[lang].saved_title}>
+    <PageShell lang={lang} STR={STR} device={device} tab={tab} setTab={setTab} openLang={openLang} currency={currency} setCurrency={setCurrency} title={STR[lang].saved_title}>
       {!auth ? <GuestGate lang={lang} STR={STR} onLogin={onLogin} />
         : apts.length === 0 ? <StateBlock icon="heart" title={STR[lang].saved_empty} sub={STR[lang].saved_empty_sub} action={STR[lang].nav_search} onAction={() => setTab("search")} />
         : <div className={`grid gap-x-6 gap-y-8 ${device === "desktop" ? "grid-cols-3" : "grid-cols-1"}`}>
-            {apts.map((a) => <AptCard key={a.id} apt={a} lang={lang} STR={STR} filters={null} onOpen={onOpen} device={device} saved={true} onToggleSave={toggleSave} />)}
+            {apts.map((a) => <AptCard key={a.id} apt={a} lang={lang} STR={STR} filters={null} onOpen={onOpen} device={device} saved={true} onToggleSave={toggleSave} currency={currency} rates={rates} />)}
           </div>}
     </PageShell>
   );
@@ -112,7 +116,7 @@ function StatusBadge({ status, lang, STR }) {
   return <span className={`inline-flex items-center h-6 px-2.5 rounded-full text-[11.5px] font-bold ${s.cls}`}>{s.label}</span>;
 }
 
-function BookingCard({ b, lang, STR, onOpen, onBookAgain, apartments }) {
+function BookingCard({ b, lang, STR, onOpen, onBookAgain, apartments, currency, rates }) {
   const apt = (apartments || []).find((a) => a.id === b.apt);
   const [menu, setMenu] = useState(false);
   if (!apt) return null;
@@ -132,7 +136,7 @@ function BookingCard({ b, lang, STR, onOpen, onBookAgain, apartments }) {
           </div>
           <div className="flex items-center justify-between gap-2 mt-2">
             <StatusBadge status={b.status} lang={lang} STR={STR} />
-            <span className="font-bold text-[15px] tnum">{b.usd != null ? `$${b.usd}` : "—"}</span>
+            <span className="font-bold text-[15px] tnum">{b.usd != null ? fmtPrice(b.usd, currency, rates) : "—"}</span>
           </div>
         </div>
       </div>
@@ -155,12 +159,12 @@ function BookingCard({ b, lang, STR, onOpen, onBookAgain, apartments }) {
   );
 }
 
-export function BookingsPage({ lang, STR, device, tab, setTab, openLang, auth, onLogin, onOpen, onBookAgain, bookings, apartments }) {
+export function BookingsPage({ lang, STR, device, tab, setTab, openLang, auth, onLogin, onOpen, onBookAgain, bookings, apartments, currency, setCurrency, rates }) {
   const [sub, setSub] = useState("active");
   const tabs = [["active", STR[lang].tab_active], ["past", STR[lang].tab_past], ["cancelled", STR[lang].tab_cancelled]];
   const items = (bookings || []).filter((b) => b.status === sub);
   return (
-    <PageShell lang={lang} STR={STR} device={device} tab={tab} setTab={setTab} openLang={openLang} title={STR[lang].bookings_title}>
+    <PageShell lang={lang} STR={STR} device={device} tab={tab} setTab={setTab} openLang={openLang} currency={currency} setCurrency={setCurrency} title={STR[lang].bookings_title}>
       {!auth ? <GuestGate lang={lang} STR={STR} onLogin={onLogin} /> : (
         <div>
           <div className="flex gap-1 p-1 rounded-full bg-cream border border-line mb-5 max-w-md">
@@ -170,7 +174,7 @@ export function BookingsPage({ lang, STR, device, tab, setTab, openLang, auth, o
           </div>
           {items.length === 0 ? <StateBlock icon="ticket" title={STR[lang].bookings_empty} sub={STR[lang].bookings_empty_sub} action={STR[lang].nav_search} onAction={() => setTab("search")} />
             : <div className={`grid gap-3 ${device === "desktop" ? "grid-cols-2" : "grid-cols-1"}`}>
-                {items.map((b) => <BookingCard key={b.id} b={b} lang={lang} STR={STR} onOpen={onOpen} onBookAgain={onBookAgain} apartments={apartments} />)}
+                {items.map((b) => <BookingCard key={b.id} b={b} lang={lang} STR={STR} onOpen={onOpen} onBookAgain={onBookAgain} apartments={apartments} currency={currency} rates={rates} />)}
               </div>}
         </div>
       )}
@@ -179,9 +183,9 @@ export function BookingsPage({ lang, STR, device, tab, setTab, openLang, auth, o
 }
 
 // ---------- Account ----------
-export function AccountPage({ lang, STR, device, tab, setTab, openLang, auth, onLogin, onLogout }) {
+export function AccountPage({ lang, STR, device, tab, setTab, openLang, auth, onLogin, onLogout, currency, setCurrency }) {
   return (
-    <PageShell lang={lang} STR={STR} device={device} tab={tab} setTab={setTab} openLang={openLang} title={STR[lang].account_title}>
+    <PageShell lang={lang} STR={STR} device={device} tab={tab} setTab={setTab} openLang={openLang} currency={currency} setCurrency={setCurrency} title={STR[lang].account_title}>
       <div className="max-w-md mx-auto">
         {auth ? (
           <div className="fade-up">

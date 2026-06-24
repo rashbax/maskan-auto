@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
 import { MASKAN } from "./data";
+import { CURRENCY_CODES, CURRENCIES } from "./money";
 
 // ---------------- Icons (stroke, currentColor) ----------------
 const PATHS = {
@@ -98,6 +99,38 @@ export function Chip({ children, active, onClick, icon }) {
       {icon && <Icon name={icon} size={15} />}
       {children}
     </button>
+  );
+}
+
+// Standalone currency picker for the header (next to the language button).
+export function CurrencyMenu({ currency, setCurrency, lang }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [open]);
+  return (
+    <div ref={ref} className="relative">
+      <button onClick={() => setOpen((o) => !o)}
+        className="inline-flex items-center gap-1 h-9 px-3 rounded-full border border-line text-[13px] font-bold hover:border-ink/30 transition">
+        {currency}<Icon name="chevD" size={15} className={`transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && (
+        <div className="absolute right-0 mt-2 w-60 rounded-2xl border border-line bg-white shadow-pop p-1.5 z-50">
+          {CURRENCY_CODES.map((c) => (
+            <button key={c} onClick={() => { setCurrency(c); setOpen(false); }}
+              className={`w-full flex items-center gap-3 h-11 px-3 rounded-xl text-left transition ${c === currency ? "bg-green-50" : "hover:bg-black/[.03]"}`}>
+              <span className="w-9 shrink-0 text-[12px] font-bold text-inksoft">{c}</span>
+              <span className={`flex-1 text-[14px] font-semibold ${c === currency ? "text-green-700" : "text-ink"}`}>{CURRENCIES[c].name[lang]}</span>
+              {c === currency && <Icon name="check" size={18} className="text-green-700" sw={2.2} />}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 

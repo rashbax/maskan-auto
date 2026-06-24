@@ -1,9 +1,10 @@
 "use client";
 import { useState, useEffect } from "react";
 import { MASKAN } from "./data";
-import { Icon, Logo, Button, Chip, Badge, Stars, Photo, Sk, Stepper, Sheet, ChannelBtn } from "./ui";
+import { Icon, Logo, Button, Chip, Badge, Stars, Photo, Sk, Stepper, Sheet, ChannelBtn, CurrencyMenu } from "./ui";
 import { AvailabilityCalendar, nightsBetween, calMonths } from "./calendar";
 import { NavLinks } from "./account";
+import { fmtPrice } from "./money";
 
 export function fmtRange(from, to, lang) {
   if (!from) return null;
@@ -14,7 +15,7 @@ export function fmtRange(from, to, lang) {
 }
 
 // --- one catalog card ---
-export function AptCard({ apt, lang, STR, filters, onOpen, device, saved, onToggleSave }) {
+export function AptCard({ apt, lang, STR, filters, onOpen, device, saved, onToggleSave, currency, rates }) {
   const M = MASKAN;
   const d = M.DISTRICTS[apt.district];
   const nights = filters?.range?.from && filters?.range?.to ? nightsBetween(filters.range.from, filters.range.to) : 0;
@@ -39,7 +40,7 @@ export function AptCard({ apt, lang, STR, filters, onOpen, device, saved, onTogg
           <Icon name="heart" size={18} fill={fav ? "#1B5E40" : "none"} className={fav ? "text-green-600" : "text-ink"} sw={1.8} /></button>
         <div className="absolute bottom-3 left-3">
           <span className="inline-flex items-baseline gap-1 px-3.5 py-2 rounded-full bg-white/95 backdrop-blur font-bold text-ink shadow-sm">
-            <span className="text-[15px] tnum">${apt.price}</span><span className="text-[12px] font-semibold text-inksoft">/{STR[lang].night1}</span>
+            <span className="text-[15px] tnum">{fmtPrice(apt.price, currency, rates)}</span><span className="text-[12px] font-semibold text-inksoft">/{STR[lang].night1}</span>
           </span>
         </div>
       </div>
@@ -55,7 +56,7 @@ export function AptCard({ apt, lang, STR, filters, onOpen, device, saved, onTogg
         </div>
         {nights > 0 && (
           <div className="mt-2.5 inline-flex items-center gap-1.5 text-[13px] font-semibold text-green-700 bg-green-50 px-2.5 py-1 rounded-lg">
-            <Icon name="check" size={14} sw={2.2} />${apt.price * nights} · {STR[lang].night_n(nights)}
+            <Icon name="check" size={14} sw={2.2} />{fmtPrice(apt.price * nights, currency, rates)} · {STR[lang].night_n(nights)}
           </div>
         )}
         {/* apartment id — so a guest can tell the host exactly which apartment they mean */}
@@ -121,7 +122,7 @@ function DistrictRow({ lang, STR, filters, setFilters }) {
   );
 }
 
-export function Catalog({ lang, STR, apartments, filters, setFilters, onOpen, device, openLang, saved, toggleSave, tab, setTab }) {
+export function Catalog({ lang, STR, apartments, filters, setFilters, onOpen, device, openLang, saved, toggleSave, tab, setTab, currency, setCurrency, rates }) {
   const M = MASKAN;
   const [loading, setLoading] = useState(true);
   const [errored, setErrored] = useState(false);
@@ -149,6 +150,7 @@ export function Catalog({ lang, STR, apartments, filters, setFilters, onOpen, de
           <Logo size={desktop ? 32 : 28} />
           {desktop && <NavLinks tab={tab} setTab={setTab} lang={lang} STR={STR} />}
           <div className="flex items-center gap-1.5">
+            <CurrencyMenu currency={currency} setCurrency={setCurrency} lang={lang} />
             <button onClick={openLang} className="inline-flex items-center gap-1.5 h-9 px-3 rounded-full border border-line text-[13px] font-bold hover:border-ink/30 transition">
               <Icon name="globe" size={16} />{STR[lang].code}</button>
           </div>
@@ -197,7 +199,7 @@ export function Catalog({ lang, STR, apartments, filters, setFilters, onOpen, de
             <StateBlock icon="search" title={STR[lang].no_results} sub={STR[lang].no_results_sub} action={STR[lang].reset} onAction={() => setFilters({ range: { from: null, to: null }, guests: 1, district: null })} />
           ) : (
             <div className={`grid gap-x-6 gap-y-8 ${desktop ? "grid-cols-3" : "grid-cols-1"}`}>
-              {list.map((a) => <AptCard key={a.id} apt={a} lang={lang} STR={STR} filters={filters} onOpen={onOpen} device={device} saved={saved && saved.has(a.id)} onToggleSave={toggleSave} />)}
+              {list.map((a) => <AptCard key={a.id} apt={a} lang={lang} STR={STR} filters={filters} onOpen={onOpen} device={device} saved={saved && saved.has(a.id)} onToggleSave={toggleSave} currency={currency} rates={rates} />)}
             </div>
           )}
         </div>
