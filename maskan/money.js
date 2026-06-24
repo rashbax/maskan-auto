@@ -11,8 +11,8 @@ export const CURRENCIES = {
 };
 export const CURRENCY_CODES = ["USD", "UZS", "RUB", "KZT", "KGS"];
 
-// default display currency for a UI language (user can override; persisted in localStorage)
-export const defaultCurrencyFor = (lang) => (lang === "ru" ? "RUB" : lang === "en" ? "USD" : "UZS");
+// first visit (no saved choice) defaults to USD for everyone; the user can switch (persisted)
+export const defaultCurrencyFor = () => "USD";
 
 // round converted amounts so they read cleanly (not 1 583 247)
 function roundNice(n, cur) {
