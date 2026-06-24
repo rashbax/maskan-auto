@@ -54,7 +54,7 @@ function Dashboard({ lang, STR, bookings, apartments, onOpenDetail }) {
   useEffect(() => { getAllBlocks().then(setBlocks); }, []);
   const today = M.iso(M.TODAY);
   const list = bookings || [];
-  const todays = list.filter((b) => b.from === today);
+  const todays = list.filter((b) => b.from === today && b.status === "active");
   // currently staying: checked in earlier and not yet checked out (would otherwise vanish from
   // the dashboard the day after check-in, since it's neither "today" nor "upcoming")
   const staying = list.filter((b) => b.from < today && b.to > today && b.status === "active");
