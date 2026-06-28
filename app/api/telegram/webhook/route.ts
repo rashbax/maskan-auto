@@ -1,18 +1,26 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { ADMIN_CHAT_IDS, isAdmin } from "@/lib/admins";
 
 export const runtime = "nodejs";
 
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const SECRET = process.env.TELEGRAM_WEBHOOK_SECRET;
-const OWNER = process.env.TELEGRAM_OWNER_CHAT_ID;
 
-async function send(chatId: number | string, text: string, extra: Record<string, unknown> = {}) {
-  await fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ chat_id: chatId, text, disable_web_page_preview: true, ...extra }),
-  });
+// Returns whether Telegram accepted the message (ok:false e.g. when the user blocked the bot or
+// never started it). Bounded so a hung Telegram call can't stall the webhook into a retry storm.
+async function send(chatId: number | string, text: string, extra: Record<string, unknown> = {}): Promise<boolean> {
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chat_id: chatId, text, disable_web_page_preview: true, ...extra }),
+      signal: AbortSignal.timeout(8000),
+    });
+    return (await res.json())?.ok === true;
+  } catch {
+    return false;
+  }
 }
 
 type From = { id?: number; first_name?: string; last_name?: string; username?: string };
@@ -63,7 +71,7 @@ export async function POST(req: Request) {
   }
 
   let update: {
-    message?: { chat?: { id?: number }; text?: string; from?: From };
+    message?: { chat?: { id?: number }; text?: string; from?: From; reply_to_message?: { text?: string } };
     callback_query?: { id?: string; data?: string; from?: From; message?: { chat?: { id?: number } } };
   };
   try {
@@ -104,6 +112,27 @@ export async function POST(req: Request) {
   const chatId = msg?.chat?.id;
   const text = msg?.text || "";
   if (!chatId) return NextResponse.json({ ok: true });
+
+  // --- /id: anyone can fetch their numeric chat id. Used to add a new admin: that account opens
+  // the bot, sends /id, and the returned number goes into TELEGRAM_OWNER_CHAT_ID (comma-separated).
+  if (text === "/id" || text === "/whoami") {
+    await send(chatId, `🆔 ${chatId}`);
+    return NextResponse.json({ ok: true });
+  }
+
+  // --- An ADMIN replies (Telegram "Reply") to a relayed guest message → deliver it to that guest.
+  // Booking notices and relayed messages carry "🆔 <chatId>"; parse it from the quoted message.
+  // This is the ONLY way to answer guests who have no public @username (a bare id isn't clickable).
+  if (isAdmin(chatId) && text && msg?.reply_to_message?.text) {
+    const m = msg.reply_to_message.text.match(/🆔 (\d+)/);
+    if (m) {
+      const ok = await send(m[1], text);
+      await send(chatId, ok
+        ? "✅ Mehmonga yuborildi."
+        : "⚠️ Yetkazib boʻlmadi — mehmon botni bloklagan yoki Start bosmagan boʻlishi mumkin. Telefon/Telegram orqali urinib koʻring.");
+      return NextResponse.json({ ok: true });
+    }
+  }
 
   // --- /start <payload> ---
   if (text.startsWith("/start ")) {
@@ -166,15 +195,17 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true });
   }
 
-  // relay any other guest message to the owner, TAGGED with the apartment/booking it came from
-  if (OWNER && String(chatId) !== String(OWNER) && text) {
+  // relay any guest message to every admin, TAGGED with the apartment/booking it came from
+  if (ADMIN_CHAT_IDS.length && !isAdmin(chatId) && text) {
     const sb = createAdminClient();
     const { data: ctx } = await sb.from("telegram_contact").select("title, booking_id").eq("chat_id", String(chatId)).maybeSingle();
     const who = `${msg?.from?.first_name || ""} ${msg?.from?.username ? "@" + msg.from.username : ""}`.trim() || `id ${chatId}`;
     const head = ctx?.title
       ? `💬 ${ctx.title}${ctx.booking_id ? ` · 🔖 ${ctx.booking_id}` : ""}\n👤 ${who}`
-      : `💬 ${who} (id ${chatId})`;
-    await send(OWNER, `${head}:\n${text}`);
+      : `💬 ${who}`;
+    // Always embed the chat id so any admin can answer by replying (works even without @username).
+    const relay = `${head}\n🆔 ${chatId}:\n${text}\n\n↩️ Javob berish uchun shu xabarga "Reply" qiling.`;
+    for (const admin of ADMIN_CHAT_IDS) await send(admin, relay);
     await send(chatId, "Xabaringiz qabul qilindi — tez orada javob beramiz.");
   }
   return NextResponse.json({ ok: true });

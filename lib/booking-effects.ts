@@ -2,9 +2,9 @@
 // committed — never exposed as a public endpoint. Both no-op gracefully when unconfigured.
 import { createAdminClient } from "@/lib/supabase/admin";
 import { beds24Enabled, pushBooking } from "@/lib/beds24";
+import { ADMIN_CHAT_IDS } from "@/lib/admins";
 
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-const CHAT = process.env.TELEGRAM_OWNER_CHAT_ID;
 const DAY = 86400000;
 
 function addDays(iso: string, days: number) {
@@ -14,7 +14,7 @@ function addDays(iso: string, days: number) {
 // Notify the host of a new booking. Idempotent: claims notified_at atomically so it can't be
 // sent twice; releases the claim if the send fails so it can be retried.
 export async function notifyOwner(id: string) {
-  if (!TOKEN || !CHAT) return;
+  if (!TOKEN || ADMIN_CHAT_IDS.length === 0) return;
   const sb = createAdminClient();
   const { data: b, error } = await sb
     .from("bookings")
@@ -28,11 +28,15 @@ export async function notifyOwner(id: string) {
   const { data: apt } = await sb.from("apartments").select("title").eq("id", b.apartment_id).single();
   const title = (apt?.title as Record<string, string> | null)?.uz || (apt?.title as Record<string, string> | null)?.ru || b.apartment_id;
 
-  // If the guest signed in with Telegram, surface their @username even if they didn't type one.
+  // If the guest signed in with Telegram, surface their @username (even if they didn't type one)
+  // and their chat id, so an admin can answer by replying to this notice (see the webhook relay).
   let acctUser: string | undefined;
+  let tgId: string | undefined;
   if (b.user_id) {
     const { data: u } = await sb.auth.admin.getUserById(b.user_id);
-    acctUser = (u?.user?.user_metadata as { user_name?: string } | undefined)?.user_name;
+    const meta = u?.user?.user_metadata as { user_name?: string; telegram_id?: string } | undefined;
+    acctUser = meta?.user_name;
+    tgId = meta?.telegram_id;
   }
   const tgHandle = b.telegram || (acctUser ? "@" + acctUser : "");
 
@@ -46,22 +50,31 @@ export async function notifyOwner(id: string) {
     `💬 Afzal: ${b.messenger}`,
     `💵 $${b.total_usd ?? "—"}`,
     `🔖 ${b.id}`,
+    tgId ? `🆔 ${tgId}` : null, // lets an admin reach the guest by replying to this message
     "",
-    "Mehmon bilan bogʻlanib, kelishda kalit va manzilni bering.",
+    tgId
+      ? "Mehmon bilan bogʻlanish: shu xabarga \"Reply\" qiling yoki tel/Telegram orqali."
+      : "Mehmon bilan bogʻlanib, kelishda kalit va manzilni bering.",
   ].filter(Boolean).join("\n");
 
-  try {
-    const res = await fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ chat_id: CHAT, text, disable_web_page_preview: true }),
-      signal: AbortSignal.timeout(8000),
-    });
-    const j = await res.json();
-    if (!j.ok) await sb.from("bookings").update({ notified_at: null }).eq("id", id); // release for retry
-  } catch {
-    await sb.from("bookings").update({ notified_at: null }).eq("id", id);
+  // Deliver to every admin. Keep notified_at set if at least one got it (don't spam on retry);
+  // only release the claim if every admin failed, so the cron can retry the whole notice.
+  let anyOk = false;
+  for (const chat of ADMIN_CHAT_IDS) {
+    try {
+      const res = await fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chat_id: chat, text, disable_web_page_preview: true }),
+        signal: AbortSignal.timeout(8000),
+      });
+      const j = await res.json();
+      if (j.ok) anyOk = true;
+    } catch {
+      /* try the next admin */
+    }
   }
+  if (!anyOk) await sb.from("bookings").update({ notified_at: null }).eq("id", id); // release for retry
 }
 
 // Bookings that originate in Maskan (the website + admin-entered manual ones) and so must be
