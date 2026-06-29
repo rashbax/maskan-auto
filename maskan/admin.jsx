@@ -136,12 +136,18 @@ function BookingRow({ b, lang, STR, onOpen, apartments }) {
           <SourceTag src={b.source} lang={lang} STR={STR} />
         </div>
         <div className="text-[12.5px] text-inksoft truncate mt-0.5"><span className="font-mono text-inksoft/70 select-all">#{b.apt}</span> · {apt.title[lang]}</div>
-        <div className="text-[12px] text-inksoft flex items-center gap-1.5 mt-0.5"><Icon name="cal" size={13} className="shrink-0" /><span className="truncate">{fmtRange(new Date(b.from), new Date(b.to), lang)} · {STR[lang].night_n(b.nights || 0)}</span></div>
+        <div className="text-[12px] text-inksoft flex items-center gap-1.5 mt-0.5"><Icon name="cal" size={13} className="shrink-0" /><span className="truncate">{fmtRange(new Date(b.from), new Date(b.to), lang)} · {STR[lang].night_n(b.nights || 0)}{partyTotal(b) > 0 ? ` · ${STR[lang].guest_n(partyTotal(b))}` : ""}</span></div>
       </div>
       <div className="font-bold text-[15px] tnum shrink-0">${b.total}</div>
       {open && <Icon name="chevR" size={16} className="text-inksoft/45 shrink-0" />}
     </div>
   );
+}
+
+// party size shown on a booking → total guests (adults nullable, children defaults 0).
+// Returns 0 when neither is set (old rows / OTA payloads without a party count) so callers can hide it.
+function partyTotal(b) {
+  return (Number(b.adults) || 0) + (Number(b.children) || 0);
 }
 
 // ---- booking detail bottom-sheet (shared by the dashboard + bookings list rows) ----
@@ -219,6 +225,7 @@ function BookingDetailSheet({ booking, lang, STR, desktop, apartments, onClose, 
           </div>
           <div className="text-[12.5px] text-inksoft text-center -mt-1">{STR[lang].night_n(b.nights || 0)}</div>
           <div className="rounded-xl border border-line px-3.5">
+            {partyTotal(b) > 0 && <MetaRow icon="users" label={STR[lang].guests} value={STR[lang].guest_n(partyTotal(b)) + ((Number(b.children) || 0) > 0 ? ` · ${Number(b.adults) || 0} ${STR[lang].a_adults} + ${b.children} ${STR[lang].a_children}` : "")} />}
             {b.phone && <MetaRow icon="phone" label={STR[lang].bd_phone} value={b.phone} href={`tel:${b.phone}`} />}
             {tg && <MetaRow icon="tg" label="Telegram" value={"@" + tg} href={`https://t.me/${tg}`} />}
             {b.email && <MetaRow icon="mail" label="Email" value={b.email} href={`mailto:${b.email}`} />}
@@ -244,6 +251,8 @@ function ManualBookingForm({ lang, STR, apartments, onDone }) {
   const [guest, setGuest] = useState("");
   const [phone, setPhone] = useState("");
   const [source, setSource] = useState("manual");
+  const [adults, setAdults] = useState(2);
+  const [children, setChildren] = useState(0);
   const [nightly, setNightly] = useState(""); // PER-NIGHT price (blank = use the listing's nightly)
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -260,7 +269,7 @@ function ManualBookingForm({ lang, STR, apartments, onDone }) {
     if (nights <= 0) { setErr("dates"); return; }
     setBusy(true);
     try {
-      await createManualBooking({ apartmentId: aptId, guestName: guest, phone, from, to, total, source });
+      await createManualBooking({ apartmentId: aptId, guestName: guest, phone, from, to, total, source, adults, children });
       onDone();
     } catch (e) {
       setBusy(false);
@@ -278,6 +287,10 @@ function ManualBookingForm({ lang, STR, apartments, onDone }) {
         <label className="block"><span className="text-[13px] font-bold">{STR[lang].checkout}</span><input type="date" value={to} onChange={(e) => setTo(e.target.value)} className={fld} /></label>
       </div>
       <label className="block"><span className="text-[13px] font-bold">{STR[lang].a_guest}</span><input value={guest} onChange={(e) => setGuest(e.target.value)} placeholder={STR[lang].name_ph} className={fld} /></label>
+      <div className="grid grid-cols-2 gap-3">
+        <div><span className="text-[13px] font-bold">{STR[lang].a_adults}</span><div className="mt-1.5 h-12 flex items-center"><Stepper value={adults} min={1} max={20} onChange={setAdults} /></div></div>
+        <div><span className="text-[13px] font-bold">{STR[lang].a_children}</span><div className="mt-1.5 h-12 flex items-center"><Stepper value={children} min={0} max={20} onChange={setChildren} /></div></div>
+      </div>
       <label className="block"><span className="text-[13px] font-bold">{STR[lang].phone}</span>
         <div className="relative">
           <span className="absolute left-4 top-1/2 -translate-y-1/2 text-inksoft font-semibold pointer-events-none">+</span>
@@ -1041,6 +1054,9 @@ export function Admin({ lang, STR, device, onExit, openLang, role, auth, onLogin
           {!desktop && (
             <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2.5 -mt-1">
               {nav.map((n) => <Chip key={n.k} active={tab === n.k} icon={n.icon} onClick={() => goTab(n.k)}>{n.label}</Chip>)}
+              {/* exit admin → catalog: the desktop sidebar has this, mobile otherwise has no way out */}
+              <span className="w-px h-9 bg-line shrink-0 self-center mx-0.5" aria-hidden="true" />
+              <Chip icon="logout" onClick={onExit}>{STR[lang].catalog}</Chip>
             </div>
           )}
         </header>

@@ -212,6 +212,8 @@ export async function getAllBookings() {
     from: b.checkin,
     to: b.checkout,
     nights: b.nights,
+    adults: b.adults,
+    children: b.children,
     total: b.total_usd,
     source: b.source,
     status: b.status,
@@ -260,11 +262,11 @@ export async function shortenBooking(id, checkout) {
 // admin records an external booking (verbal / OLX / Booking.com) — counts toward revenue.
 // Goes through a server route (not a direct insert) so "manual" bookings are mirrored into Beds24,
 // closing the dates on connected OTAs. Overlap errors come back as { error: "overlap" }.
-export async function createManualBooking({ apartmentId, guestName, phone, from, to, total, source }) {
+export async function createManualBooking({ apartmentId, guestName, phone, from, to, total, source, adults, children }) {
   const res = await fetch("/api/manual-booking", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ apartmentId, guestName, phone, from, to, total, source }),
+    body: JSON.stringify({ apartmentId, guestName, phone, from, to, total, source, adults, children }),
   });
   const j = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(j.error || "manual_booking_failed");

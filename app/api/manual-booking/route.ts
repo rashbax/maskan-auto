@@ -46,6 +46,13 @@ export async function POST(req: Request) {
   const source = body.source === "booking" ? "booking" : "manual";
   const totalNum = Number(body.total);
   const total = Number.isFinite(totalNum) ? Math.max(0, Math.round(totalNum)) : null;
+  // party size (optional): adults is nullable, children defaults to 0; clamp to sane non-negatives
+  const clampCount = (v: unknown, max: number) => {
+    const n = Number(v);
+    return Number.isFinite(n) ? Math.min(max, Math.max(0, Math.round(n))) : null;
+  };
+  const adults = clampCount(body.adults, 99);
+  const children = clampCount(body.children, 99) ?? 0;
 
   if (!apartmentId || !validDate(from) || !validDate(to)) return NextResponse.json({ error: "bad_input" }, { status: 400 });
   const nights = Math.round((Date.parse(to) - Date.parse(from)) / DAY);
@@ -66,6 +73,8 @@ export async function POST(req: Request) {
     checkin: from,
     checkout: to,
     nights,
+    adults,
+    children,
     total_usd: total,
     source,
     status: "active",
