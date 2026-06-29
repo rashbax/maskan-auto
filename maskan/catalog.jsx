@@ -5,6 +5,7 @@ import { Icon, Logo, Button, Chip, Badge, Stars, Photo, Sk, Stepper, Sheet, Chan
 import { AvailabilityCalendar, nightsBetween, calMonths } from "./calendar";
 import { NavLinks } from "./account";
 import { fmtPrice } from "./money";
+import { WEBSITE_DISCOUNT_PCT, directTotal } from "../lib/pricing";
 
 export function fmtRange(from, to, lang) {
   if (!from) return null;
@@ -31,7 +32,8 @@ export function AptCard({ apt, lang, STR, filters, onOpen, device, saved, onTogg
     <div role="button" tabIndex={0} onClick={() => onOpen(apt)} onKeyDown={(e) => e.key === "Enter" && onOpen(apt)} className="group text-left w-full fade-up cursor-pointer">
       <div className="relative aspect-[4/3] rounded-2xl overflow-hidden shadow-card">
         <Photo tone={apt.tone} idx={apt.id.charCodeAt(1)} src={apt.photoUrls?.[0]} label="apartment photo" className="w-full h-full group-hover:scale-[1.03] transition-transform duration-500" />
-        <div className="absolute top-3 left-3 flex gap-2">
+        <div className="absolute top-3 left-3 flex flex-wrap gap-2">
+          <Badge tone="green" icon="ticket">{STR[lang].disc_badge(WEBSITE_DISCOUNT_PCT)}</Badge>
           {apt.superhost && <Badge tone="cream" icon="shield">{STR[lang].superhost}</Badge>}
           {d.centre && <Badge tone="ink">{STR[lang].centre}</Badge>}
         </div>
@@ -56,7 +58,7 @@ export function AptCard({ apt, lang, STR, filters, onOpen, device, saved, onTogg
         </div>
         {nights > 0 && (
           <div className="mt-2.5 inline-flex items-center gap-1.5 text-[13px] font-semibold text-green-700 bg-green-50 px-2.5 py-1 rounded-lg">
-            <Icon name="check" size={14} sw={2.2} />{fmtPrice(apt.price * nights, currency, rates)} · {STR[lang].night_n(nights)}
+            <Icon name="check" size={14} sw={2.2} />{fmtPrice(directTotal(apt.price * nights), currency, rates)} · {STR[lang].night_n(nights)}
           </div>
         )}
         {/* apartment id — so a guest can tell the host exactly which apartment they mean */}

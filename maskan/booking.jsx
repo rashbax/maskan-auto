@@ -6,6 +6,7 @@ import { nightsBetween } from "./calendar";
 import { fmtRange } from "./catalog";
 import { createBooking } from "./db";
 import { fmtPrice } from "./money";
+import { directTotal, directSavings, WEBSITE_DISCOUNT_PCT } from "../lib/pricing";
 
 function Field({ label, help, error, children }) {
   return (
@@ -22,8 +23,9 @@ function Field({ label, help, error, children }) {
 
 const inputCls = "w-full h-13 px-4 rounded-xl bg-white border border-line text-[15px] outline-none focus:border-green-600 focus:ring-2 focus:ring-green-600/15 transition placeholder:text-inksoft/50";
 
-function SummaryStrip({ apt, range, lang, STR, currency, rates }) {
+function SummaryStrip({ apt, range, lang, STR }) {
   const nights = nightsBetween(range.from, range.to);
+  // pricing lives in PriceBreakdown (shown right below) — the strip is just an at-a-glance header
   return (
     <div className="flex items-center gap-3 p-3 rounded-2xl bg-white border border-line">
       <div className="w-16 h-16 rounded-xl overflow-hidden shrink-0"><Photo tone={apt.tone} idx={0} eager showLabel={false} className="w-full h-full" /></div>
@@ -31,7 +33,30 @@ function SummaryStrip({ apt, range, lang, STR, currency, rates }) {
         <div className="font-serif text-[15px] leading-snug truncate">{apt.title[lang]}</div>
         <div className="text-[12.5px] text-inksoft mt-0.5">{fmtRange(range.from, range.to, lang)} · {STR[lang].night_n(nights)}</div>
       </div>
-      <div className="text-right shrink-0"><div className="font-bold text-[17px] tnum">{fmtPrice(apt.price * nights, currency, rates)}</div><div className="text-[11px] text-green-700 font-semibold">{STR[lang].nofees}</div></div>
+    </div>
+  );
+}
+
+// Direct-booking price breakdown: full subtotal → −discount → what you pay, + a savings note.
+// Shared by the apartment reserve card and the booking flow so the numbers/copy never diverge.
+export function PriceBreakdown({ perNightUsd, nights, currency, rates, lang, STR }) {
+  const full = perNightUsd * nights;
+  const P = (usd) => fmtPrice(usd, currency, rates);
+  return (
+    <div className="rounded-2xl border border-line bg-white p-4">
+      <div className="flex items-center justify-between text-[14px]">
+        <span className="text-inksoft">{P(perNightUsd)} × {STR[lang].night_n(nights)}</span>
+        <span className="tnum text-ink">{P(full)}</span>
+      </div>
+      <div className="flex items-center justify-between text-[14px] mt-2">
+        <span className="inline-flex items-center gap-1.5 font-semibold text-green-700"><Icon name="ticket" size={15} />{STR[lang].disc_line(WEBSITE_DISCOUNT_PCT)}</span>
+        <span className="tnum font-semibold text-green-700">−{P(directSavings(full))}</span>
+      </div>
+      <div className="flex items-center justify-between mt-3 pt-3 border-t border-line">
+        <span className="font-serif text-[16px]">{STR[lang].total}</span>
+        <span className="font-bold text-[20px] tnum">{P(directTotal(full))}</span>
+      </div>
+      <div className="flex items-center gap-1.5 mt-2 text-[12.5px] font-semibold text-green-700"><Icon name="check" size={14} sw={2.4} />{STR[lang].disc_save(P(directSavings(full)))}</div>
     </div>
   );
 }
@@ -79,7 +104,10 @@ function Confirmation({ apt, range, form, lang, STR, onHome, bookingId, loggedIn
         <p className="text-inksoft text-[14px] mt-1.5 tnum">{STR[lang].booking_no} <b className="text-ink">{bookingId}</b></p>
       </div>
 
-      <div className="mt-6"><SummaryStrip apt={apt} range={range} lang={lang} STR={STR} currency={currency} rates={rates} /></div>
+      <div className="mt-6 space-y-3">
+        <SummaryStrip apt={apt} range={range} lang={lang} STR={STR} />
+        <PriceBreakdown perNightUsd={apt.price} nights={nights} currency={currency} rates={rates} lang={lang} STR={STR} />
+      </div>
 
       <div className="mt-6">
         <h2 className="font-serif text-[19px] mb-3">{STR[lang].whatsnext}</h2>
@@ -166,7 +194,8 @@ export function Booking({ apt, range, lang, STR, device, onBack, onHome, onBooke
     <>
       {step === "form" && (
         <div className="fade-up">
-          <SummaryStrip apt={apt} range={range} lang={lang} STR={STR} currency={currency} rates={rates} />
+          <SummaryStrip apt={apt} range={range} lang={lang} STR={STR} />
+          <div className="mt-3"><PriceBreakdown perNightUsd={apt.price} nights={nightsBetween(range.from, range.to)} currency={currency} rates={rates} lang={lang} STR={STR} /></div>
           <h2 className="font-serif text-[22px] mt-6 mb-1">{STR[lang].reserve_title}</h2>
           <p className="text-[13.5px] text-inksoft mb-5">{lang === "ru" ? "Две детали — и квартира ваша." : lang === "uz" ? "Ikkita maʼlumot — va kvartira sizniki." : "Two details and the place is yours."}</p>
           <div className="space-y-4">
@@ -252,7 +281,7 @@ export function Booking({ apt, range, lang, STR, device, onBack, onHome, onBooke
       {step === "form" && (
         <div className="sticky bottom-0 bg-white border-t border-line shadow-bar px-4 py-3">
           <div className={`${desktop ? "max-w-lg mx-auto" : ""}`}>
-            <Button full size="lg" icon="bolt" onClick={submit}><span className="whitespace-nowrap">{STR[lang].confirm_book} · {fmtPrice(apt.price * nightsBetween(range.from, range.to), currency, rates)}</span></Button>
+            <Button full size="lg" icon="bolt" onClick={submit}><span className="whitespace-nowrap">{STR[lang].confirm_book} · {fmtPrice(directTotal(apt.price * nightsBetween(range.from, range.to)), currency, rates)}</span></Button>
           </div>
         </div>
       )}

@@ -1,11 +1,12 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
 import { MASKAN } from "./data";
-import { Button } from "./ui";
+import { Button, Icon } from "./ui";
 import { AvailabilityCalendar, nightsBetween } from "./calendar";
-import { Booking } from "./booking";
+import { Booking, PriceBreakdown } from "./booking";
 import { createClient } from "../lib/supabase/client";
 import { fmtPrice, CURRENCY_CODES, defaultCurrencyFor } from "./money";
+import { directTotal, WEBSITE_DISCOUNT_PCT } from "../lib/pricing";
 import { getRates, RATE_FALLBACK } from "./db";
 
 function useLang() {
@@ -89,15 +90,25 @@ export function AptReserve({ apt, lang: langProp }) {
         <div className="flex items-baseline gap-1.5 mb-4">
           <span className="font-bold text-[24px] tnum">{P(apt.price)}</span>
           <span className="text-[14px] text-inksoft font-semibold">/ {STR[lang].night1}</span>
-          {nights > 0 && <span className="ml-auto text-[14px] font-semibold text-green-700">{P(apt.price * nights)} · {STR[lang].night_n(nights)}</span>}
+          <span className="ml-auto self-center inline-flex items-center gap-1 px-2 h-6 rounded-full bg-green-50 text-green-700 text-[11.5px] font-bold"><Icon name="ticket" size={13} />{STR[lang].disc_badge(WEBSITE_DISCOUNT_PCT)}</span>
         </div>
         {currency !== "USD" && <div className="text-[11px] text-inksoft -mt-3 mb-3">{STR[lang].price_approx}</div>}
+        {nights === 0 && <div className="flex items-center gap-1.5 text-[12.5px] font-semibold text-green-700 mb-3"><Icon name="ticket" size={14} />{STR[lang].disc_hint(WEBSITE_DISCOUNT_PCT)}</div>}
         <AvailabilityCalendar lang={lang} STR={STR} busy={busy} value={range} onChange={setRange} months={1} />
+        {nights > 0 && <div className="mt-4"><PriceBreakdown perNightUsd={apt.price} nights={nights} currency={currency} rates={rates} lang={lang} STR={STR} /></div>}
         <div className="mt-4">
           <Button full size="lg" icon="bolt" disabled={!nights} onClick={() => setBooking(true)}>
-            {nights ? `${STR[lang].confirm_book} · ${P(apt.price * nights)}` : STR[lang].select_dates}
+            {nights ? `${STR[lang].confirm_book} · ${P(directTotal(apt.price * nights))}` : STR[lang].select_dates}
           </Button>
         </div>
+        {/* secondary: let the guest clear a started/finished selection back to an empty calendar
+            (picking can only re-set the start otherwise — there was no way back to zero) */}
+        {range.from && (
+          <button onClick={() => setRange({ from: null, to: null })}
+            className="w-full mt-2 inline-flex items-center justify-center gap-1.5 h-10 text-[13.5px] font-semibold text-inksoft hover:text-ink transition">
+            <Icon name="x" size={15} />{STR[lang].clear}
+          </button>
+        )}
         <p className="text-[12px] text-inksoft text-center mt-3">{STR[lang].nofees}</p>
       </div>
 
@@ -108,11 +119,13 @@ export function AptReserve({ apt, lang: langProp }) {
         <div className="max-w-6xl mx-auto flex items-center gap-3">
           <div className="shrink-0">
             <div className="font-bold text-[18px] tnum leading-none">{P(apt.price)}<span className="text-[13px] text-inksoft font-semibold"> / {STR[lang].night1}</span></div>
-            {nights > 0 && <div className="text-[12px] text-green-700 font-semibold mt-1">{P(apt.price * nights)} · {STR[lang].night_n(nights)}</div>}
+            {nights > 0
+              ? <div className="text-[12px] text-green-700 font-semibold mt-1">{P(directTotal(apt.price * nights))} · {STR[lang].night_n(nights)}</div>
+              : <div className="text-[12px] text-green-700 font-semibold mt-1">{STR[lang].disc_badge(WEBSITE_DISCOUNT_PCT)}</div>}
           </div>
           <div className="ml-auto">
             <Button size="lg" icon="bolt" onClick={onReserve}>
-              <span className="whitespace-nowrap">{nights ? `${STR[lang].confirm_book} · ${P(apt.price * nights)}` : STR[lang].select_dates}</span>
+              <span className="whitespace-nowrap">{nights ? `${STR[lang].confirm_book} · ${P(directTotal(apt.price * nights))}` : STR[lang].select_dates}</span>
             </Button>
           </div>
         </div>

@@ -7,6 +7,7 @@ import { Gallery } from "@/maskan/gallery";
 import { SaveButton, ReviewWidget } from "@/maskan/apt-actions";
 import { Description } from "@/maskan/description";
 import { SITE_URL as BASE } from "@/lib/site-url";
+import { WEBSITE_DISCOUNT_PCT } from "@/lib/pricing";
 
 export type Locale = "uz" | "ru" | "en";
 export const LOCALES: Locale[] = ["uz", "ru", "en"];
@@ -115,6 +116,7 @@ export function ApartmentView({ apt, locale }: { apt: any; locale: Locale }) {
             </div>
             <h1 className="font-serif text-[28px] md:text-[34px] leading-[1.12] mt-1.5" style={{ textWrap: "balance" }}>{name}</h1>
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 mt-3 text-[14px] text-inksoft font-medium">
+              <span className="inline-flex items-center px-2 h-6 rounded-full bg-green-50 text-green-700 text-[12px] font-bold">{S.disc_badge(WEBSITE_DISCOUNT_PCT)}</span>
               <span>★ {apt.rating.toFixed(2)} ({apt.reviews})</span>
               <span>· {S.sleeps(apt.sleeps)}</span>
               <span>· {apt.beds} {T.beds[locale]}</span>

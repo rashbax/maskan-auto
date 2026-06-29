@@ -1,6 +1,7 @@
 import { NextResponse, after } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { notifyOwner, pushToBeds24 } from "@/lib/booking-effects";
+import { directTotal } from "@/lib/pricing";
 
 export const runtime = "nodejs";
 
@@ -94,7 +95,8 @@ export async function POST(req: Request) {
     checkin: from,
     checkout: to,
     nights,
-    total_usd: apt.price_usd * nights,
+    // website = direct channel → apply the 10% direct-booking discount to the canonical total
+    total_usd: directTotal(apt.price_usd * nights),
     source: "website",
     status: "active",
   });
