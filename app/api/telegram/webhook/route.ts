@@ -45,6 +45,13 @@ const CONSENT = {
 
 const pick = (lang?: string) => CONSENT[(lang as keyof typeof CONSENT)] || CONSENT.uz;
 
+// The user's language on top, with the Uzbek version below it (the audience is Uzbek-first, and
+// many read Uzbek better than the ru/en they happened to pick). Deduped when already Uzbek.
+function bilingual(lang: string | undefined, key: "text" | "done") {
+  const c = pick(lang);
+  return c === CONSENT.uz ? CONSENT.uz[key] : `${c[key]}\n\n— — —\n\n${CONSENT.uz[key]}`;
+}
+
 // Apartment enquiry: the guest tapped "Telegram" on an apartment. We greet by apartment name and
 // invite them to write here — the bot remembers the apartment (telegram_contact) and tags every
 // relayed message with it, so the operator always sees which apartment the message is about.
@@ -104,7 +111,7 @@ export async function POST(req: Request) {
       body: JSON.stringify({ callback_query_id: cb.id, text: upd ? "✅" : "Muddati oʻtgan" }),
     });
     const cbChat = cb.message?.chat?.id;
-    if (upd && cbChat) await send(cbChat, pick((upd as { lang?: string }).lang).done);
+    if (upd && cbChat) await send(cbChat, bilingual((upd as { lang?: string }).lang, "done"));
     return NextResponse.json({ ok: true });
   }
 
@@ -183,7 +190,7 @@ export async function POST(req: Request) {
       const { data: row } = await sb.from("telegram_login").select("status, lang").eq("nonce", nonce).single();
       if (row?.status === "pending") {
         const c = pick(row.lang);
-        await send(chatId, c.text, { reply_markup: { inline_keyboard: [[{ text: c.button, callback_data: `login:${nonce}` }]] } });
+        await send(chatId, bilingual(row.lang, "text"), { reply_markup: { inline_keyboard: [[{ text: c.button, callback_data: `login:${nonce}` }]] } });
         return NextResponse.json({ ok: true });
       }
     }
