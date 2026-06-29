@@ -5,7 +5,9 @@ const SECRET = process.env.TELEGRAM_WEBHOOK_SECRET;
 const URL = process.env.WEBHOOK_URL || "https://maskan-24.uz/api/telegram/webhook";
 if (!TOKEN) { console.error("❌ TELEGRAM_BOT_TOKEN .env.local da yo'q"); process.exit(1); }
 
-const body = { url: URL, allowed_updates: ["message"], drop_pending_updates: true };
+// "callback_query" is required for the login consent button (inline keyboard tap); without it
+// Telegram never delivers the tap and the bot-nonce login silently never confirms.
+const body = { url: URL, allowed_updates: ["message", "callback_query"], drop_pending_updates: true };
 if (SECRET) body.secret_token = SECRET;
 
 const r = await fetch(`https://api.telegram.org/bot${TOKEN}/setWebhook`, {
