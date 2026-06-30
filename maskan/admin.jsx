@@ -468,6 +468,21 @@ function Listings({ lang, STR, onEdit, apartments }) {
   );
 }
 
+// Human-readable reason for a photo-upload failure (admin-facing). The direct browser->R2 PUT,
+// when blocked by CORS (the site origin missing from the bucket policy) or offline, surfaces as a
+// TypeError ("Failed to fetch") with no HTTP status — the most common and least obvious cause.
+function uploadErrMsg(err, lang) {
+  const raw = String(err?.message || err || "");
+  const t = (uz, ru, en) => (lang === "ru" ? ru : lang === "uz" ? uz : en);
+  if (err instanceof TypeError || /failed to fetch|networkerror|load failed/i.test(raw))
+    return t("Rasm xotiraga yuklanmadi (CORS yoki tarmoq). R2 bucket origin sozlamasini tekshiring.",
+             "Фото не загрузилось в хранилище (CORS или сеть). Проверьте origin в настройках R2 bucket.",
+             "Upload to storage failed (CORS or network). Check the R2 bucket origin settings.");
+  if (/r2_not_configured/.test(raw)) return t("Rasm xizmati sozlanmagan (R2).", "Хранилище не настроено (R2).", "Storage not configured (R2).");
+  if (/forbidden|unauthorized|\b401\b|\b403\b/.test(raw)) return t("Ruxsat yoʻq — admin sifatida qayta kiring.", "Нет доступа — войдите как админ.", "Not authorized — sign in as admin.");
+  return t(`Rasm yuklanmadi (${raw || "xato"}).`, `Не удалось загрузить (${raw || "ошибка"}).`, `Upload failed (${raw || "error"}).`);
+}
+
 // ---- add/edit with photo uploader ----
 function EditApt({ lang, STR, id, onBack, apartments, onSaved }) {
   const M = MASKAN;
@@ -489,6 +504,7 @@ function EditApt({ lang, STR, id, onBack, apartments, onSaved }) {
   const [nearI18n, setNearI18n] = useState(apt ? { uz: apt.near?.uz || "", ru: apt.near?.ru || "", en: apt.near?.en || "" } : { uz: "", ru: "", en: "" });
   const [editLang, setEditLang] = useState(lang);
   const [saving, setSaving] = useState(false);
+  const [uploadErr, setUploadErr] = useState(null); // surfaced near the uploader (was a silent console-only catch)
   // New apartments get a human-friendly 6-digit numeric id (no letters), unique among
   // the loaded list; the DB primary key is the final guard. Existing ones keep their id.
   const [aptId] = useState(() => {
@@ -552,19 +568,24 @@ function EditApt({ lang, STR, id, onBack, apartments, onSaved }) {
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
     setSaving(true);
+    setUploadErr(null);
     try {
       await persistApartment(); // ensure the apartment row exists (FK)
       let sort = photos.length;
       for (const f of files) {
         const blob = await resizeImage(f);
         const { url, publicUrl } = await requestUploadUrl(aptId, "image/webp");
+        // direct browser->R2 PUT — a CORS/offline failure throws a TypeError (no `.ok`/status)
         const put = await fetch(url, { method: "PUT", headers: { "Content-Type": "image/webp" }, body: blob });
-        if (!put.ok) throw new Error("put_failed");
+        if (!put.ok) throw new Error(`put_${put.status}`);
         await addPhoto(aptId, publicUrl, sort, sort === 0);
         sort++;
       }
       setPhotos(await getPhotos(aptId));
-    } catch (err) { console.error("upload failed:", err); }
+    } catch (err) {
+      console.error("upload failed:", err);
+      setUploadErr(uploadErrMsg(err, lang));
+    }
     setSaving(false);
     if (fileRef.current) fileRef.current.value = "";
   }
@@ -601,6 +622,7 @@ function EditApt({ lang, STR, id, onBack, apartments, onSaved }) {
             <div className="text-center px-2"><Icon name={saving ? "refresh" : "plus"} size={22} className={`mx-auto ${saving ? "animate-spin" : ""}`} /><div className="text-[10.5px] font-semibold mt-1 leading-tight">{saving ? "…" : STR[lang].a_drop}</div></div>
           </button>
         </div>
+        {uploadErr && <div role="alert" className="text-[13px] text-[#9a4a3c] bg-red-50 rounded-lg p-3 mt-3">{uploadErr}</div>}
         <p className="text-[12px] text-inksoft mt-2">{lang === "ru" ? "Перетащите фото мышкой, чтобы изменить порядок. Первое фото — обложка. Авто-сжатие (WebP) → R2." : lang === "uz" ? "Tartibni o'zgartirish uchun rasmni sichqoncha bilan suring. Birinchi rasm — muqova. Avto-siqish (WebP) → R2." : "Drag photos to reorder. The first photo is the cover. Auto-compressed (WebP) → R2."}</p>
       </div>
       {/* title (3 languages) */}
