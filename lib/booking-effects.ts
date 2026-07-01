@@ -42,7 +42,9 @@ export async function notifyOwner(id: string) {
 
   const text = [
     "🆕 Yangi bron!",
-    `🏠 ${title}`,
+    // apartment id after the name (NOT with 🆔 — that prefix is reserved for the guest chat id
+    // the reply-relay parses; a numeric apartment id there would hijack replies to the wrong chat)
+    `🏠 ${title}${title === b.apartment_id ? "" : ` · ${b.apartment_id}`}`,
     `📅 ${b.checkin} → ${b.checkout} (${b.nights} kecha)`,
     `👤 ${b.guest_name || "—"}`,
     b.adults != null ? `👥 ${b.adults} katta${b.children ? `, ${b.children} bola` : ""}` : null,
