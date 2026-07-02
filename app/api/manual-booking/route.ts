@@ -2,6 +2,7 @@ import { NextResponse, after } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { pushToBeds24 } from "@/lib/booking-effects";
+import { oneLine } from "@/lib/sanitize";
 
 export const runtime = "nodejs";
 
@@ -41,8 +42,9 @@ export async function POST(req: Request) {
   const apartmentId = String(body.apartmentId || "");
   const from = String(body.from || "");
   const to = String(body.to || "");
-  const guestName = String(body.guestName || "").trim();
-  const phone = String(body.phone || "").trim();
+  // same single-line sanitation as /api/book (these fields reach Telegram notices / Beds24 notes)
+  const guestName = oneLine(body.guestName, 100);
+  const phone = oneLine(body.phone, 32);
   const source = body.source === "booking" ? "booking" : "manual";
   const totalNum = Number(body.total);
   const total = Number.isFinite(totalNum) ? Math.max(0, Math.round(totalNum)) : null;

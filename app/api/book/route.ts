@@ -2,6 +2,7 @@ import { NextResponse, after } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { notifyOwner, pushToBeds24 } from "@/lib/booking-effects";
 import { directTotal } from "@/lib/pricing";
+import { oneLine } from "@/lib/sanitize";
 
 export const runtime = "nodejs";
 
@@ -33,9 +34,11 @@ export async function POST(req: Request) {
   const apartmentId = String(body.apartmentId || "");
   const from = String(body.from || "");
   const to = String(body.to || "");
-  const guestName = String(body.guestName || "").trim();
-  const phone = String(body.phone || "").trim();
-  const telegram = body.telegram ? String(body.telegram) : null;
+  // guest text is forced to a single bounded line (lib/sanitize) — it is echoed into the
+  // Telegram booking notice, whose "🆔 <chatId>" line the admin reply-relay parses
+  const guestName = oneLine(body.guestName, 100);
+  const phone = oneLine(body.phone, 32);
+  const telegram = oneLine(body.telegram, 64) || null;
   const messenger = body.messenger === "whatsapp" ? "whatsapp" : "telegram";
   const adults = Math.trunc(Number(body.adults));
   const children = Math.trunc(Number(body.children));

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ADMIN_CHAT_IDS, isAdmin } from "@/lib/admins";
+import { oneLine } from "@/lib/sanitize";
 
 export const runtime = "nodejs";
 
@@ -131,7 +132,10 @@ export async function POST(req: Request) {
   // Booking notices and relayed messages carry "🆔 <chatId>"; parse it from the quoted message.
   // This is the ONLY way to answer guests who have no public @username (a bare id isn't clickable).
   if (isAdmin(chatId) && text && msg?.reply_to_message?.text) {
-    const m = msg.reply_to_message.text.match(/🆔 (\d+)/);
+    // Line-anchored: only the notice's own "🆔 <chatId>" line can match. Guest-supplied fields
+    // are sanitized to a single mid-line fragment (lib/sanitize), so they can't fake a line
+    // start; in the relay format the genuine 🆔 line precedes the guest text, so it wins.
+    const m = msg.reply_to_message.text.match(/^🆔 (\d+)\b/m);
     if (m) {
       const ok = await send(m[1], text);
       await send(chatId, ok
@@ -206,7 +210,7 @@ export async function POST(req: Request) {
   if (ADMIN_CHAT_IDS.length && !isAdmin(chatId) && text) {
     const sb = createAdminClient();
     const { data: ctx } = await sb.from("telegram_contact").select("title, booking_id").eq("chat_id", String(chatId)).maybeSingle();
-    const who = `${msg?.from?.first_name || ""} ${msg?.from?.username ? "@" + msg.from.username : ""}`.trim() || `id ${chatId}`;
+    const who = oneLine(`${msg?.from?.first_name || ""} ${msg?.from?.username ? "@" + msg.from.username : ""}`, 64) || `id ${chatId}`;
     const head = ctx?.title
       ? `💬 ${ctx.title}${ctx.booking_id ? ` · 🔖 ${ctx.booking_id}` : ""}\n👤 ${who}`
       : `💬 ${who}`;

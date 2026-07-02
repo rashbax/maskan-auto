@@ -3,6 +3,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { beds24Enabled, pushBooking } from "@/lib/beds24";
 import { ADMIN_CHAT_IDS } from "@/lib/admins";
+import { oneLine } from "@/lib/sanitize";
 
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const DAY = 86400000;
@@ -38,7 +39,11 @@ export async function notifyOwner(id: string) {
     acctUser = meta?.user_name;
     tgId = meta?.telegram_id;
   }
-  const tgHandle = b.telegram || (acctUser ? "@" + acctUser : "");
+  // sanitize at compose time too (not only at /api/book) so pre-existing rows and any other
+  // insert path can never smuggle a line-start "🆔 <digits>" into the notice the relay parses
+  const guest = oneLine(b.guest_name, 100);
+  const phone = oneLine(b.phone, 32);
+  const tgHandle = oneLine(b.telegram || (acctUser ? "@" + acctUser : ""), 64);
 
   const text = [
     "🆕 Yangi bron!",
@@ -46,9 +51,9 @@ export async function notifyOwner(id: string) {
     // the reply-relay parses; a numeric apartment id there would hijack replies to the wrong chat)
     `🏠 ${title}${title === b.apartment_id ? "" : ` · ${b.apartment_id}`}`,
     `📅 ${b.checkin} → ${b.checkout} (${b.nights} kecha)`,
-    `👤 ${b.guest_name || "—"}`,
+    `👤 ${guest || "—"}`,
     b.adults != null ? `👥 ${b.adults} katta${b.children ? `, ${b.children} bola` : ""}` : null,
-    `📞 ${b.phone || "—"}${tgHandle ? " · " + tgHandle : ""}`,
+    `📞 ${phone || "—"}${tgHandle ? " · " + tgHandle : ""}`,
     `💬 Afzal: ${b.messenger}`,
     `💵 $${b.total_usd ?? "—"}`,
     `🔖 ${b.id}`,
