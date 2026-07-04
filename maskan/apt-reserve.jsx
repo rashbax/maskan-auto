@@ -123,7 +123,13 @@ export function AptReserve({ apt, lang: langProp }) {
               ? <div className="text-[12px] text-green-700 font-semibold mt-1">{P(directTotal(apt.price * nights))} · {STR[lang].night_n(nights)}</div>
               : <div className="text-[12px] text-green-700 font-semibold mt-1">{STR[lang].disc_badge(WEBSITE_DISCOUNT_PCT)}</div>}
           </div>
-          <div className="ml-auto">
+          <div className="ml-auto flex items-center gap-2">
+            {range.from && (
+              <button onClick={() => setRange({ from: null, to: null })} aria-label={STR[lang].clear} title={STR[lang].clear}
+                className="w-14 h-14 shrink-0 grid place-items-center rounded-full border border-line text-inksoft hover:text-ink hover:border-ink/30 transition">
+                <Icon name="x" size={20} />
+              </button>
+            )}
             <Button size="lg" icon="bolt" onClick={onReserve}>
               <span className="whitespace-nowrap">{nights ? `${STR[lang].confirm_book} · ${P(directTotal(apt.price * nights))}` : STR[lang].select_dates}</span>
             </Button>

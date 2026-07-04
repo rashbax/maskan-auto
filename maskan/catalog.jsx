@@ -95,7 +95,15 @@ function FilterControls({ lang, STR, filters, setFilters, device }) {
   return (
     <div className="space-y-7">
       <div>
-        <div className="text-[12px] font-bold tracking-wide uppercase text-inksoft mb-3">{STR[lang].stay}</div>
+        <div className="flex items-center justify-between mb-3">
+          <div className="text-[12px] font-bold tracking-wide uppercase text-inksoft">{STR[lang].stay}</div>
+          {filters.range?.from && (
+            <button onClick={() => setFilters({ ...filters, range: { from: null, to: null } })}
+              className="inline-flex items-center gap-1 text-[12.5px] font-semibold text-inksoft hover:text-ink transition">
+              <Icon name="x" size={14} />{STR[lang].clear}
+            </button>
+          )}
+        </div>
         {/* catalog filter spans all listings → plain range picker (no per-apartment free/busy) */}
         <AvailabilityCalendar lang={lang} STR={STR} busy={new Set()} value={filters.range} onChange={(r) => setFilters({ ...filters, range: r })} months={device === "desktop" ? 2 : 1} showAvailability={false} />
       </div>
@@ -135,8 +143,10 @@ export function Catalog({ lang, STR, apartments, filters, setFilters, onOpen, de
   const list = (apartments || []).filter((a) => {
     if (filters.district && a.district !== filters.district) return false;
     if (filters.guests && a.sleeps < filters.guests) return false;
-    if (filters.range?.from && filters.range?.to) {
-      for (let x = new Date(filters.range.from); x < filters.range.to; x = M.addDays(x, 1)) if (a.busy.has(M.iso(x))) return false;
+    if (filters.range?.from) {
+      // one day picked (no checkout yet) → check just that single night; a full range checks every night
+      const end = filters.range.to || M.addDays(filters.range.from, 1);
+      for (let x = new Date(filters.range.from); x < end; x = M.addDays(x, 1)) if (a.busy.has(M.iso(x))) return false;
     }
     return true;
   });
