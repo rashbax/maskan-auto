@@ -478,17 +478,6 @@ function BookingsList({ lang, STR, bookings, apartments, onChanged, onOpenDetail
   const matchQuery = (b) => !q || [b.guest, b.id, b.phone, aptTitle(b.apt)].some((v) => (v || "").toLowerCase().includes(q));
   const filtered = list.filter((b) => matchStatus(b, status) && matchSource(b, source) && matchQuery(b));
   const shown = filtered.slice(0, limit);
-  // subtotal for the currently filtered view — cancelled rows stay visible but never add to
-  // nights/revenue. When source = all, also break the revenue down per source.
-  const SRC_ORDER = ["website", "booking", "manual"];
-  const sub = { count: filtered.length, nights: 0, revenue: 0, bySrc: { website: { c: 0, r: 0 }, booking: { c: 0, r: 0 }, manual: { c: 0, r: 0 } } };
-  for (const b of filtered) {
-    if (b.status === "cancelled") continue;
-    sub.nights += b.nights || 0;
-    if (b.total) sub.revenue += b.total;
-    const k = sub.bySrc[b.source];
-    if (k) { k.c++; if (b.total) k.r += b.total; }
-  }
   // counts stay contextual to the other dimensions + the search
   const statusCount = (s) => list.filter((b) => matchSource(b, source) && matchQuery(b) && matchStatus(b, s)).length;
   const sourceCount = (k) => list.filter((b) => matchStatus(b, status) && matchQuery(b) && matchSource(b, k)).length;
@@ -530,19 +519,6 @@ function BookingsList({ lang, STR, bookings, apartments, onChanged, onOpenDetail
           </div>
         </div>
       </div>
-
-      {filtered.length > 0 && (
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mb-3 px-1 text-[12.5px]">
-          <span className="font-bold text-ink">{T("Итого", "Jami", "Subtotal")} · {sub.count}</span>
-          <span className="text-inksoft">{STR[lang].night_n(sub.nights)}</span>
-          <span className="font-bold tnum">${sub.revenue}</span>
-          {source === "all" && SRC_ORDER.filter((k) => sub.bySrc[k].c > 0).map((k) => (
-            <span key={k} className="inline-flex items-center gap-1 text-inksoft">
-              <span className="w-1.5 h-1.5 rounded-full" style={{ background: SRC[k].color }} />{STR[lang][SRC[k].key]} <b className="text-ink tnum">${sub.bySrc[k].r}</b>
-            </span>
-          ))}
-        </div>
-      )}
 
       <div className="space-y-2">
         {shown.length === 0
