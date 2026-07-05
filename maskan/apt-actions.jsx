@@ -42,7 +42,7 @@ export function SaveButton({ aptId, lang }) {
     else { setSaved(true); addFavorite(aptId); }
   }
   return (
-    <button type="button" onClick={toggle} aria-label="save"
+    <button type="button" onClick={toggle} aria-pressed={saved}
       className="inline-flex items-center gap-1.5 h-9 px-3 rounded-full bg-white border border-line text-[13.5px] font-semibold hover:border-ink/30 transition shrink-0">
       <Icon name="heart" size={17} fill={saved ? "#1B5E40" : "none"} className={saved ? "text-green-600" : "text-ink"} sw={1.9} />
       {saved ? (lang === "ru" ? "Сохранено" : lang === "en" ? "Saved" : "Saqlandi") : (lang === "ru" ? "Сохранить" : lang === "en" ? "Save" : "Saqlash")}

@@ -210,16 +210,17 @@ export function Booking({ apt, range, lang, STR, device, onBack, onHome, onBooke
               </div>
               <div className="text-[12px] text-inksoft mt-2.5">{lang === "ru" ? `Максимум ${apt.sleeps} гостей` : lang === "uz" ? `Koʻpi bilan ${apt.sleeps} mehmon` : `Up to ${apt.sleeps} guests`}</div>
             </div>
-            <Field label={STR[lang].your_name} error={errs.name && "⚠"}>
-              <input className={inputCls} placeholder={STR[lang].name_ph} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+            <Field label={STR[lang].your_name} error={errs.name && (lang === "ru" ? "Введите имя" : lang === "uz" ? "Ismingizni kiriting" : "Enter your name")}>
+              <input className={inputCls + (errs.name ? " border-[#B3402E]! focus:border-[#B3402E]!" : "")} placeholder={STR[lang].name_ph} value={form.name}
+                onChange={(e) => { setForm({ ...form, name: e.target.value }); if (errs.name) setErrs((x) => ({ ...x, name: undefined })); }} />
             </Field>
-            <Field label={STR[lang].phone} help={STR[lang].phone_help} error={errs.phone && (lang === "ru" ? "неверный номер" : lang === "uz" ? "notoʻgʻri raqam" : "invalid number")}>
+            <Field label={STR[lang].phone} help={STR[lang].phone_help} error={errs.phone && (lang === "ru" ? "9 цифр номера" : lang === "uz" ? "9 ta raqam kiriting" : "Enter 9 digits")}>
               {/* fixed "+" prefix so guests can't forget it; a bare 9-digit UZ mobile gets +998 on blur */}
               <div className="relative">
                 <span className="absolute left-4 top-1/2 -translate-y-1/2 text-inksoft font-semibold pointer-events-none">+</span>
-                <input className={inputCls + " pl-8"} inputMode="tel" placeholder="998 90 123 45 67"
+                <input className={inputCls + " pl-8" + (errs.phone ? " border-[#B3402E]! focus:border-[#B3402E]!" : "")} inputMode="tel" placeholder="998 90 123 45 67"
                   value={form.phone.replace(/^\+/, "")}
-                  onChange={(e) => setForm({ ...form, phone: "+" + e.target.value.replace(/[^\d\s\-()]/g, "") })}
+                  onChange={(e) => { setForm({ ...form, phone: "+" + e.target.value.replace(/[^\d\s\-()]/g, "") }); if (errs.phone) setErrs((x) => ({ ...x, phone: undefined })); }}
                   onBlur={() => setForm((f) => { const d = f.phone.replace(/\D/g, ""); return d.length === 9 ? { ...f, phone: "+998" + d } : f; })} />
               </div>
             </Field>
@@ -279,7 +280,7 @@ export function Booking({ apt, range, lang, STR, device, onBack, onHome, onBooke
       <div className={`flex-1 px-4 py-5 ${desktop ? "max-w-lg mx-auto w-full" : ""}`}>{content}</div>
 
       {step === "form" && (
-        <div className="sticky bottom-0 bg-white border-t border-line shadow-bar px-4 py-3">
+        <div className="sticky bottom-0 bg-white border-t border-line shadow-bar px-4 pt-3" style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}>
           <div className={`${desktop ? "max-w-lg mx-auto" : ""}`}>
             <Button full size="lg" icon="bolt" onClick={submit}><span className="whitespace-nowrap">{STR[lang].confirm_book} · {fmtPrice(directTotal(apt.price * nightsBetween(range.from, range.to)), currency, rates)}</span></Button>
           </div>

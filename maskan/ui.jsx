@@ -209,6 +209,12 @@ export function Stepper({ value, min = 1, max = 12, onChange }) {
 
 // ---------------- Bottom sheet / modal ----------------
 export function Sheet({ open, onClose, children, title, desktop, footer }) {
+  const panelRef = useRef(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose; // listeners read the latest onClose without re-subscribing
+  const [drag, setDrag] = useState(0); // px dragged down (mobile swipe-to-dismiss)
+  const startY = useRef(null);
+
   // While the sheet is open, freeze the page behind it: without this the booking list scrolls
   // under the sheet, and a pull-up gesture rubber-bands the body so the sheet's bottom detaches.
   useEffect(() => {
@@ -223,18 +229,58 @@ export function Sheet({ open, onClose, children, title, desktop, footer }) {
       body.style.overscrollBehavior = prevOverscroll;
     };
   }, [open]);
+
+  // Move focus into the sheet on open and restore it on close. Depends only on `open` so a parent
+  // re-render (e.g. typing in a field) never re-steals focus.
+  useEffect(() => {
+    if (!open) return;
+    const prevFocus = document.activeElement;
+    panelRef.current?.focus();
+    return () => { if (prevFocus && prevFocus.focus) prevFocus.focus(); };
+  }, [open]);
+
+  // ESC-to-close + focus trap (Tab cycles within the sheet). Stable listener; reads onClose via ref.
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e) => {
+      if (e.key === "Escape") { onCloseRef.current(); return; }
+      if (e.key !== "Tab") return;
+      const panel = panelRef.current;
+      const f = panel?.querySelectorAll('a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])');
+      if (!f || !f.length) return;
+      const first = f[0], last = f[f.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open]);
+
   if (!open) return null;
+
+  // Swipe-to-dismiss (mobile): drag the header down; release past ~90px to close, else snap back.
+  const swipe = desktop ? {} : {
+    onTouchStart: (e) => { startY.current = e.touches[0].clientY; },
+    onTouchMove: (e) => { if (startY.current != null) { const dy = e.touches[0].clientY - startY.current; setDrag(dy > 0 ? dy : 0); } },
+    onTouchEnd: () => { if (drag > 90) onClose(); setDrag(0); startY.current = null; },
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center overscroll-none" onClick={onClose}>
       <div className="absolute inset-0 bg-ink/45 pop-in" />
-      <div onClick={(e) => e.stopPropagation()}
-        className={`relative w-full bg-canvas sheet-up ${desktop ? "max-w-md rounded-3xl m-auto" : "rounded-t-3xl"} shadow-pop max-h-[90%] flex flex-col min-h-0`}>
-        <div className="flex items-center justify-between px-5 pt-4 pb-2 shrink-0">
-          <div className="font-serif text-[19px]">{title}</div>
-          <button onClick={onClose} className="w-9 h-9 grid place-items-center rounded-full hover:bg-black/5"><Icon name="x" size={20} /></button>
+      <div ref={panelRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label={title || undefined}
+        onClick={(e) => e.stopPropagation()}
+        style={{ transform: drag ? `translateY(${drag}px)` : undefined, transition: drag ? "none" : "transform .2s ease" }}
+        className={`relative w-full bg-canvas sheet-up outline-none ${desktop ? "max-w-md rounded-3xl m-auto" : "rounded-t-3xl"} shadow-pop max-h-[90%] flex flex-col min-h-0`}>
+        <div className="shrink-0" {...swipe}>
+          {!desktop && <div className="pt-2.5 pb-1 flex justify-center touch-none"><span className="w-9 h-1 rounded-full bg-ink/[.18]" aria-hidden="true" /></div>}
+          <div className="flex items-center justify-between px-5 pt-2 pb-2">
+            <div className="font-serif text-[19px]">{title}</div>
+            <button onClick={onClose} aria-label="Close" className="w-9 h-9 grid place-items-center rounded-full hover:bg-black/5"><Icon name="x" size={20} /></button>
+          </div>
         </div>
         <div className="overflow-y-auto overscroll-contain no-scrollbar px-5 pb-5 flex-1 min-h-0">{children}</div>
-        {footer && <div className="shrink-0 px-5 pt-3 pb-4 border-t border-line bg-canvas">{footer}</div>}
+        {footer && <div className="shrink-0 px-5 pt-3 border-t border-line bg-canvas" style={{ paddingBottom: "calc(1rem + env(safe-area-inset-bottom))" }}>{footer}</div>}
       </div>
     </div>
   );

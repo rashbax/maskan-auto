@@ -1,13 +1,22 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
 import { MASKAN } from "./data";
-import { Button, Icon } from "./ui";
+import { Button, Icon, CurrencyMenu } from "./ui";
 import { AvailabilityCalendar, nightsBetween } from "./calendar";
 import { Booking, PriceBreakdown } from "./booking";
 import { createClient } from "../lib/supabase/client";
 import { fmtPrice, CURRENCY_CODES, defaultCurrencyFor } from "./money";
 import { directTotal, WEBSITE_DISCOUNT_PCT } from "../lib/pricing";
 import { getRates, RATE_FALLBACK } from "./db";
+
+// The apartment page is a SEPARATE SSR route with independent client islands (the header currency
+// picker and the reserve card). They sync the chosen display currency through localStorage + a
+// same-tab custom event so switching in the header re-prices the reserve card instantly.
+const CURRENCY_EVT = "maskan:currency";
+function readCurrency(lang) {
+  const s = typeof window !== "undefined" ? localStorage.getItem("maskan_currency") : null;
+  return CURRENCY_CODES.includes(s) ? s : defaultCurrencyFor(lang);
+}
 
 function useLang() {
   const [lang, setLang] = useState("uz");
@@ -18,15 +27,35 @@ function useLang() {
   return lang;
 }
 
-// the apartment page is its own SSR route — read the display currency from localStorage
-// (set on the catalog), falling back to the language default. Server render uses USD.
+// read the display currency from localStorage (set on the catalog or the header picker below),
+// falling back to the language default. Server render uses USD. Re-reads on the sync event.
 function useCurrency(lang) {
   const [cur, setCur] = useState("USD");
   useEffect(() => {
-    const s = typeof window !== "undefined" ? localStorage.getItem("maskan_currency") : null;
-    setCur(CURRENCY_CODES.includes(s) ? s : defaultCurrencyFor(lang));
+    setCur(readCurrency(lang));
+    const onCur = (e) => setCur(e.detail);
+    window.addEventListener(CURRENCY_EVT, onCur);
+    return () => window.removeEventListener(CURRENCY_EVT, onCur);
   }, [lang]);
   return cur;
+}
+
+// Standalone currency picker for the SSR apartment-page header. Writes localStorage and broadcasts
+// the sync event so the reserve island (a separate client root) re-prices without a reload.
+export function AptCurrencyMenu({ lang }) {
+  const [currency, setCur] = useState("USD");
+  useEffect(() => {
+    setCur(readCurrency(lang));
+    const onCur = (e) => setCur(e.detail);
+    window.addEventListener(CURRENCY_EVT, onCur);
+    return () => window.removeEventListener(CURRENCY_EVT, onCur);
+  }, [lang]);
+  const setCurrency = (c) => {
+    setCur(c);
+    try { localStorage.setItem("maskan_currency", c); } catch { /* ignore */ }
+    window.dispatchEvent(new CustomEvent(CURRENCY_EVT, { detail: c }));
+  };
+  return <CurrencyMenu currency={currency} setCurrency={setCurrency} lang={lang} />;
 }
 
 // Interactive booking island for the server-rendered apartment page: availability calendar +

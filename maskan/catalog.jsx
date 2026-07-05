@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { MASKAN } from "./data";
 import { Icon, Logo, Button, Chip, Badge, Stars, Photo, Sk, Stepper, Sheet, ChannelBtn, CurrencyMenu } from "./ui";
 import { AvailabilityCalendar, nightsBetween, calMonths } from "./calendar";
@@ -38,7 +38,8 @@ export function AptCard({ apt, lang, STR, filters, onOpen, device, saved, onTogg
           {d.centre && <Badge tone="ink">{STR[lang].centre}</Badge>}
         </div>
         <button onClick={(e) => { e.stopPropagation(); onToggleSave && onToggleSave(apt.id); }}
-          className="absolute top-3 right-3 w-9 h-9 grid place-items-center rounded-full bg-white/90 backdrop-blur hover:scale-110 transition-transform">
+          aria-label={fav ? STR[lang].saved_title : STR[lang].a_save} aria-pressed={fav}
+          className="absolute top-3 right-3 w-10 h-10 grid place-items-center rounded-full bg-white/90 backdrop-blur hover:scale-110 transition-transform">
           <Icon name="heart" size={18} fill={fav ? "#1B5E40" : "none"} className={fav ? "text-green-600" : "text-ink"} sw={1.8} /></button>
         <div className="absolute bottom-3 left-3">
           <span className="inline-flex items-baseline gap-1 px-3.5 py-2 rounded-full bg-white/95 backdrop-blur font-bold text-ink shadow-sm">
@@ -95,15 +96,7 @@ function FilterControls({ lang, STR, filters, setFilters, device }) {
   return (
     <div className="space-y-7">
       <div>
-        <div className="flex items-center justify-between mb-3">
-          <div className="text-[12px] font-bold tracking-wide uppercase text-inksoft">{STR[lang].stay}</div>
-          {filters.range?.from && (
-            <button onClick={() => setFilters({ ...filters, range: { from: null, to: null } })}
-              className="inline-flex items-center gap-1 text-[12.5px] font-semibold text-inksoft hover:text-ink transition">
-              <Icon name="x" size={14} />{STR[lang].clear}
-            </button>
-          )}
-        </div>
+        <div className="text-[12px] font-bold tracking-wide uppercase text-inksoft mb-3">{STR[lang].stay}</div>
         {/* catalog filter spans all listings → plain range picker (no per-apartment free/busy) */}
         <AvailabilityCalendar lang={lang} STR={STR} busy={new Set()} value={filters.range} onChange={(r) => setFilters({ ...filters, range: r })} months={device === "desktop" ? 2 : 1} showAvailability={false} />
       </div>
@@ -134,12 +127,12 @@ function DistrictRow({ lang, STR, filters, setFilters }) {
 
 export function Catalog({ lang, STR, apartments, filters, setFilters, onOpen, device, openLang, saved, toggleSave, tab, setTab, currency, setCurrency, rates }) {
   const M = MASKAN;
-  const [loading, setLoading] = useState(true);
   const [errored, setErrored] = useState(false);
   const [showFilter, setShowFilter] = useState(false);
-  useEffect(() => { setLoading(true); const t = setTimeout(() => setLoading(false), 850); return () => clearTimeout(t); }, [filters.range, filters.district, filters.guests]);
 
-  const isLoading = loading || apartments == null;
+  // local filtering is synchronous — only the real Supabase fetch (apartments == null) shows
+  // skeletons. Filter changes re-render instantly; the cards' own fade-up covers the swap.
+  const isLoading = apartments == null;
   const list = (apartments || []).filter((a) => {
     if (filters.district && a.district !== filters.district) return false;
     if (filters.guests && a.sleeps < filters.guests) return false;
@@ -202,13 +195,13 @@ export function Catalog({ lang, STR, apartments, filters, setFilters, onOpen, de
           )}
 
           {errored ? (
-            <StateBlock icon="bolt" title={STR[lang].error_title} sub={STR[lang].error_sub} action={STR[lang].retry} onAction={() => { setErrored(false); setLoading(true); setTimeout(() => setLoading(false), 700); }} />
+            <StateBlock icon="bolt" title={STR[lang].error_title} sub={STR[lang].error_sub} action={STR[lang].retry} onAction={() => setErrored(false)} />
           ) : isLoading ? (
             <div className={`grid gap-x-6 gap-y-8 ${desktop ? "grid-cols-3" : "grid-cols-1"}`}>
               {Array.from({ length: desktop ? 6 : 3 }).map((_, i) => <CardSkeleton key={i} />)}
             </div>
           ) : list.length === 0 ? (
-            <StateBlock icon="search" title={STR[lang].no_results} sub={STR[lang].no_results_sub} action={STR[lang].reset} onAction={() => setFilters({ range: { from: null, to: null }, guests: 1, district: null })} />
+            <StateBlock icon="search" title={STR[lang].no_results} sub={STR[lang].no_results_sub} action={STR[lang].reset} onAction={() => setFilters({ range: { from: null, to: null }, guests: 2, district: null })} />
           ) : (
             <div className={`grid gap-x-6 gap-y-8 ${desktop ? "grid-cols-3" : "grid-cols-1"}`}>
               {list.map((a) => <AptCard key={a.id} apt={a} lang={lang} STR={STR} filters={filters} onOpen={onOpen} device={device} saved={saved && saved.has(a.id)} onToggleSave={toggleSave} currency={currency} rates={rates} />)}
@@ -239,7 +232,16 @@ export function Catalog({ lang, STR, apartments, filters, setFilters, onOpen, de
       </div>
 
       <Sheet open={showFilter} onClose={() => setShowFilter(false)} title={STR[lang].filters} desktop={desktop}
-        footer={<Button full size="lg" onClick={() => setShowFilter(false)}>{STR[lang].apply}</Button>}>
+        footer={
+          <div className="flex items-center gap-3">
+            {(filters.range?.from || filters.district || filters.guests !== 2) && (
+              <Button variant="outline" size="lg" className="shrink-0" onClick={() => setFilters({ range: { from: null, to: null }, guests: 2, district: null })}>{STR[lang].clear}</Button>
+            )}
+            <Button full size="lg" onClick={() => setShowFilter(false)}>
+              {lang === "ru" ? `Показать ${list.length} вариантов` : lang === "uz" ? `${list.length} ta variantni koʻrsatish` : `Show ${list.length} places`}
+            </Button>
+          </div>
+        }>
         <FilterControls lang={lang} STR={STR} filters={filters} setFilters={setFilters} device={device} />
       </Sheet>
     </div>

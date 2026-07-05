@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { MASKAN } from "@/maskan/data";
 import { MapView } from "@/maskan/maps";
-import { AptReserve } from "@/maskan/apt-reserve";
+import { AptReserve, AptCurrencyMenu } from "@/maskan/apt-reserve";
 import { Gallery } from "@/maskan/gallery";
 import { SaveButton, ReviewWidget } from "@/maskan/apt-actions";
 import { Description } from "@/maskan/description";
@@ -97,7 +97,10 @@ export function ApartmentView({ apt, locale }: { apt: any; locale: Locale }) {
             </span>
             {T.catalog[locale]}
           </Link>
-          <span className="ml-auto font-serif text-[18px] font-semibold">Maskan</span>
+          <div className="ml-auto flex items-center gap-2.5">
+            <AptCurrencyMenu lang={locale} />
+            <span className="font-serif text-[18px] font-semibold">Maskan</span>
+          </div>
         </div>
       </header>
 

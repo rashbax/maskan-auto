@@ -129,10 +129,10 @@ export function AvailabilityCalendar({ lang, STR, busy, value, onChange, months 
         </div>
       )}
       <div className="relative">
-        <button onClick={() => shift(-1)} disabled={!canPrev}
-          className="absolute -top-1 left-0 z-20 w-9 h-9 grid place-items-center rounded-full hover:bg-black/5 disabled:opacity-25"><Icon name="chevL" size={18} /></button>
-        <button onClick={() => shift(1)}
-          className="absolute -top-1 right-0 z-20 w-9 h-9 grid place-items-center rounded-full hover:bg-black/5"><Icon name="chevR" size={18} /></button>
+        <button onClick={() => shift(-1)} disabled={!canPrev} aria-label={lang === "ru" ? "Предыдущий месяц" : lang === "uz" ? "Oldingi oy" : "Previous month"}
+          className="absolute -top-1.5 left-0 z-20 w-11 h-11 grid place-items-center rounded-full hover:bg-black/5 disabled:opacity-25"><Icon name="chevL" size={18} /></button>
+        <button onClick={() => shift(1)} aria-label={lang === "ru" ? "Следующий месяц" : lang === "uz" ? "Keyingi oy" : "Next month"}
+          className="absolute -top-1.5 right-0 z-20 w-11 h-11 grid place-items-center rounded-full hover:bg-black/5"><Icon name="chevR" size={18} /></button>
         <div className={`grid ${months === 2 ? "grid-cols-2 gap-8" : "grid-cols-1"}`} onMouseLeave={() => setHover(null)}>
           <MonthGrid year={view.y} month={view.m} lang={lang} busy={busy} from={from} to={to} hover={hover} onPick={pick} onHover={setHover} showAvailability={showAvailability} />
           {months === 2 && <MonthGrid year={nextView.y} month={nextView.m} lang={lang} busy={busy} from={from} to={to} hover={hover} onPick={pick} onHover={setHover} showAvailability={showAvailability} />}

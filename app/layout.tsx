@@ -49,6 +49,7 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
+  viewportFit: "cover", // let content use the full screen; fixed bars pad with env(safe-area-inset-*)
 };
 
 export default function RootLayout({

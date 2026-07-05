@@ -31,7 +31,7 @@ export function NavLinks({ tab, setTab, lang, STR }) {
 
 export function BottomNav({ tab, setTab, lang, STR }) {
   return (
-    <div className="fixed bottom-0 inset-x-0 z-40 bg-white/96 backdrop-blur border-t border-line flex">
+    <div className="fixed bottom-0 inset-x-0 z-40 bg-white/96 backdrop-blur border-t border-line flex" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
       {NAV.map((n) => {
         const active = tab === n.key;
         return (
