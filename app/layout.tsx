@@ -19,16 +19,30 @@ const spectral = Spectral({
   display: "swap",
 });
 
+const siteTitle = "Maskan — Квартиры посуточно в Ташкенте";
+const siteDescription =
+  "Реальные фото, честная цена, мгновенное бронирование. Посуточная аренда квартир в Ташкенте — без звонков.";
+const siteImage = "/maskan-logo.png";
+
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
-  title: "Maskan — Квартиры посуточно в Ташкенте",
-  description:
-    "Реальные фото, честная цена, мгновенное бронирование. Посуточная аренда квартир в Ташкенте — без звонков.",
+  title: siteTitle,
+  description: siteDescription,
+  alternates: { canonical: "/" },
   openGraph: {
-    title: "Maskan — Квартиры посуточно в Ташкенте",
-    description: "Реальные фото, честная цена, мгновенное бронирование. Посуточная аренда квартир в Ташкенте.",
+    title: siteTitle,
+    description: siteDescription,
     type: "website",
+    url: "/",
+    siteName: "Maskan",
     locale: "ru_RU",
+    images: [{ url: siteImage, alt: "Maskan" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: siteTitle,
+    description: siteDescription,
+    images: [siteImage],
   },
 };
 
