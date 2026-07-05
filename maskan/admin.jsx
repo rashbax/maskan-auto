@@ -65,6 +65,8 @@ function Dashboard({ lang, STR, bookings, apartments, onOpenDetail }) {
   const daysInMonth = new Date(y, mo + 1, 0).getDate();
   const mStart = new Date(y, mo, 1), mEnd = new Date(y, mo + 1, 1);
   let bookedNights = 0, monthRevenue = 0;
+  // per-source breakdown for the same in-month, prorated window (feature: source performance)
+  const bySource = { website: { count: 0, nights: 0, revenue: 0 }, booking: { count: 0, nights: 0, revenue: 0 }, manual: { count: 0, nights: 0, revenue: 0 } };
   for (const b of list) {
     if (b.status === "cancelled") continue;
     const s = Math.max(new Date(b.from).getTime(), mStart.getTime());
@@ -73,7 +75,10 @@ function Dashboard({ lang, STR, bookings, apartments, onOpenDetail }) {
     const nim = Math.round((e - s) / 86400000);
     bookedNights += nim;
     const bNights = b.nights || Math.round((new Date(b.to) - new Date(b.from)) / 86400000) || 1;
-    if (b.total) monthRevenue += (b.total / bNights) * nim;
+    const rev = b.total ? (b.total / bNights) * nim : 0;
+    monthRevenue += rev;
+    const src = bySource[b.source];
+    if (src) { src.count++; src.nights += nim; src.revenue += rev; }
   }
   // owner-blocked days aren't "available" inventory, so exclude them from the denominator
   // (occupancy = sold nights / available nights, not / total capacity)
@@ -86,6 +91,11 @@ function Dashboard({ lang, STR, bookings, apartments, onOpenDetail }) {
   const totalNights = Math.max(0, (apartments || []).length * daysInMonth - blockedNights);
   const occupancy = totalNights > 0 ? Math.round((bookedNights / totalNights) * 100) : 0;
   const revenue = Math.round(monthRevenue);
+  // today operations: check-ins (= todays), check-outs, and derived cleaning (urgent when the same
+  // apartment also has a check-in today, i.e. a same-day turnover)
+  const checkouts = list.filter((b) => b.to === today && b.status === "active");
+  const checkinApts = new Set(todays.map((b) => b.apt));
+  const cleaning = checkouts.map((b) => ({ b, urgent: checkinApts.has(b.apt) }));
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -94,12 +104,8 @@ function Dashboard({ lang, STR, bookings, apartments, onOpenDetail }) {
         <StatCard label={STR[lang].a_occupancy} value={occupancy + "%"} sub={calMonths[lang][M.TODAY.getMonth()]} />
         <StatCard label={STR[lang].a_revenue} value={"$" + revenue} sub={calMonths[lang][M.TODAY.getMonth()]} accent />
       </div>
-      <div>
-        <h3 className="font-serif text-[19px] mb-3">{STR[lang].a_today}</h3>
-        {todays.length === 0 ? <div className="text-[14px] text-inksoft py-6 text-center border border-dashed border-line rounded-2xl">—</div> : (
-          <div className="space-y-2">{todays.map((b) => <BookingRow key={b.id} b={b} lang={lang} STR={STR} apartments={apartments} onOpen={onOpenDetail} />)}</div>
-        )}
-      </div>
+      <SourceBreakdown lang={lang} STR={STR} bySource={bySource} totalNights={bookedNights} totalRevenue={monthRevenue} />
+      <OpsBoard lang={lang} STR={STR} checkins={todays} checkouts={checkouts} cleaning={cleaning} apartments={apartments} onOpen={onOpenDetail} />
       {staying.length > 0 && (
         <div>
           <h3 className="font-serif text-[19px] mb-3">{STR[lang].a_staying}</h3>
@@ -109,6 +115,101 @@ function Dashboard({ lang, STR, bookings, apartments, onOpenDetail }) {
       <div>
         <h3 className="font-serif text-[19px] mb-3">{STR[lang].a_upcoming}</h3>
         <div className="space-y-2">{upcoming.map((b) => <BookingRow key={b.id} b={b} lang={lang} STR={STR} apartments={apartments} onOpen={onOpenDetail} />)}</div>
+      </div>
+    </div>
+  );
+}
+
+// current-month performance by booking source (count / booked nights / prorated revenue + shares)
+function SourceBreakdown({ lang, STR, bySource, totalNights, totalRevenue }) {
+  const T = (ru, uz, en) => (lang === "ru" ? ru : lang === "uz" ? uz : en);
+  const order = ["website", "booking", "manual"];
+  if (!order.some((k) => bySource[k].count > 0)) return null;
+  return (
+    <div>
+      <h3 className="font-serif text-[19px] mb-3">{T("По источнику", "Manba boʻyicha", "By source")} · {calMonths[lang][MASKAN.TODAY.getMonth()]}</h3>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        {order.map((k) => {
+          const s = bySource[k], c = SRC[k];
+          const revShare = totalRevenue > 0 ? Math.round((s.revenue / totalRevenue) * 100) : 0;
+          const nightShare = totalNights > 0 ? Math.round((s.nights / totalNights) * 100) : 0;
+          return (
+            <div key={k} className="rounded-2xl border border-line bg-white p-4">
+              <div className="flex items-center justify-between">
+                <span className="inline-flex items-center gap-1.5 text-[12.5px] font-bold" style={{ color: c.color }}>
+                  <span className="w-2 h-2 rounded-full" style={{ background: c.color }} />{STR[lang][c.key]}
+                </span>
+                <span className="text-[12px] text-inksoft tnum">{s.count}</span>
+              </div>
+              <div className="mt-2 flex items-baseline justify-between">
+                <span className="font-bold text-[20px] tnum">${Math.round(s.revenue)}</span>
+                <span className="text-[12px] font-semibold tnum" style={{ color: c.color }}>{revShare}%</span>
+              </div>
+              <div className="text-[12px] text-inksoft">{STR[lang].night_n(s.nights)} · {nightShare}% {T("ночей", "kecha", "nights")}</div>
+              <div className="mt-2.5 h-1.5 rounded-full bg-black/[.06] overflow-hidden"><div className="h-full rounded-full" style={{ width: revShare + "%", background: c.color }} /></div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// one compact operations row: apartment, guest, source, a time hint + total; opens the detail sheet
+// (existing contact pattern) and offers quick call / Telegram links reusing the tel:/t.me hrefs.
+function OpsCard({ b, kind, urgent, lang, STR, apartments, onOpen }) {
+  const apt = (apartments || []).find((a) => a.id === b.apt) || aptById(b.apt);
+  if (!apt) return null;
+  const T = (ru, uz, en) => (lang === "ru" ? ru : lang === "uz" ? uz : en);
+  const time = kind === "in" ? apt.checkInTime : apt.checkOutTime; // getApartments already defaults 14:00 / 12:00
+  const tg = b.tg ? b.tg.replace(/^@/, "") : "";
+  const open = onOpen ? () => onOpen(b) : undefined;
+  return (
+    <div role={open ? "button" : undefined} tabIndex={open ? 0 : undefined}
+      onClick={open} onKeyDown={open ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); } } : undefined}
+      className={`flex items-center gap-3 p-3 rounded-xl border bg-white ${urgent ? "border-[#9a4a3c]/45" : "border-line"} ${open ? "cursor-pointer hover:bg-black/[.02] transition" : ""}`}>
+      <div className="w-11 h-11 rounded-lg overflow-hidden shrink-0"><Photo tone={apt.tone} idx={0} eager showLabel={false} src={apt.photoUrls?.[0]} className="w-full h-full" /></div>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="font-bold text-[14px] truncate max-w-full">{b.guest}</span>
+          <SourceTag src={b.source} lang={lang} STR={STR} />
+          {urgent && <span className="inline-flex items-center px-2 h-5 rounded-full text-[10.5px] font-bold" style={{ color: "#9a4a3c", background: "#fbeae6" }}>{T("Срочный оборот", "Shoshilinch almashuv", "Urgent turnover")}</span>}
+        </div>
+        <div className="text-[12.5px] text-inksoft truncate mt-0.5"><span className="font-mono text-inksoft/70 select-all">#{b.apt}</span> · {apt.title[lang]}</div>
+        <div className="text-[12px] text-inksoft flex items-center gap-1.5 mt-0.5"><Icon name="clock" size={13} className="shrink-0" />{time}{b.total != null ? ` · $${b.total}` : ""}</div>
+      </div>
+      {(b.phone || tg) && (
+        <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+          {b.phone && <a href={`tel:${b.phone}`} aria-label={STR[lang].bd_call} className="w-9 h-9 grid place-items-center rounded-full border border-line text-inksoft hover:text-ink hover:border-ink/30 transition"><Icon name="phone" size={16} /></a>}
+          {tg && <a href={`https://t.me/${tg}`} target="_blank" rel="noreferrer" aria-label="Telegram" className="w-9 h-9 grid place-items-center rounded-full border border-line text-inksoft hover:text-ink hover:border-ink/30 transition"><Icon name="tg" size={16} /></a>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// today's operations: check-ins, check-outs, and derived cleaning (urgent = same-day turnover)
+function OpsBoard({ lang, STR, checkins, checkouts, cleaning, apartments, onOpen }) {
+  const T = (ru, uz, en) => (lang === "ru" ? ru : lang === "uz" ? uz : en);
+  const groups = [
+    { key: "in", icon: "arrowR", title: T("Заезды", "Kelishlar", "Check-ins"), items: checkins.map((b) => ({ b, urgent: false })) },
+    { key: "out", icon: "arrowL", title: T("Выезды", "Ketishlar", "Check-outs"), items: checkouts.map((b) => ({ b, urgent: false })) },
+    { key: "clean", icon: "refresh", title: T("Уборка", "Tozalash", "Cleaning"), items: cleaning },
+  ];
+  return (
+    <div>
+      <h3 className="font-serif text-[19px] mb-3">{T("Операции на сегодня", "Bugungi operatsiyalar", "Today operations")}</h3>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {groups.map((g) => (
+          <div key={g.key}>
+            <div className="flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-wide text-inksoft mb-2">
+              <Icon name={g.icon} size={14} />{g.title}<span className="tnum opacity-55">{g.items.length}</span>
+            </div>
+            {g.items.length === 0
+              ? <div className="text-[13px] text-inksoft py-4 text-center border border-dashed border-line rounded-xl">—</div>
+              : <div className="space-y-2">{g.items.map(({ b, urgent }) => <OpsCard key={g.key + b.id} b={b} kind={g.key} urgent={urgent} lang={lang} STR={STR} apartments={apartments} onOpen={onOpen} />)}</div>}
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -377,6 +478,17 @@ function BookingsList({ lang, STR, bookings, apartments, onChanged, onOpenDetail
   const matchQuery = (b) => !q || [b.guest, b.id, b.phone, aptTitle(b.apt)].some((v) => (v || "").toLowerCase().includes(q));
   const filtered = list.filter((b) => matchStatus(b, status) && matchSource(b, source) && matchQuery(b));
   const shown = filtered.slice(0, limit);
+  // subtotal for the currently filtered view — cancelled rows stay visible but never add to
+  // nights/revenue. When source = all, also break the revenue down per source.
+  const SRC_ORDER = ["website", "booking", "manual"];
+  const sub = { count: filtered.length, nights: 0, revenue: 0, bySrc: { website: { c: 0, r: 0 }, booking: { c: 0, r: 0 }, manual: { c: 0, r: 0 } } };
+  for (const b of filtered) {
+    if (b.status === "cancelled") continue;
+    sub.nights += b.nights || 0;
+    if (b.total) sub.revenue += b.total;
+    const k = sub.bySrc[b.source];
+    if (k) { k.c++; if (b.total) k.r += b.total; }
+  }
   // counts stay contextual to the other dimensions + the search
   const statusCount = (s) => list.filter((b) => matchSource(b, source) && matchQuery(b) && matchStatus(b, s)).length;
   const sourceCount = (k) => list.filter((b) => matchStatus(b, status) && matchQuery(b) && matchSource(b, k)).length;
@@ -418,6 +530,19 @@ function BookingsList({ lang, STR, bookings, apartments, onChanged, onOpenDetail
           </div>
         </div>
       </div>
+
+      {filtered.length > 0 && (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mb-3 px-1 text-[12.5px]">
+          <span className="font-bold text-ink">{T("Итого", "Jami", "Subtotal")} · {sub.count}</span>
+          <span className="text-inksoft">{STR[lang].night_n(sub.nights)}</span>
+          <span className="font-bold tnum">${sub.revenue}</span>
+          {source === "all" && SRC_ORDER.filter((k) => sub.bySrc[k].c > 0).map((k) => (
+            <span key={k} className="inline-flex items-center gap-1 text-inksoft">
+              <span className="w-1.5 h-1.5 rounded-full" style={{ background: SRC[k].color }} />{STR[lang][SRC[k].key]} <b className="text-ink tnum">${sub.bySrc[k].r}</b>
+            </span>
+          ))}
+        </div>
+      )}
 
       <div className="space-y-2">
         {shown.length === 0
