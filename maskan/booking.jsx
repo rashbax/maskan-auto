@@ -23,14 +23,17 @@ function Field({ label, help, error, children }) {
 
 const inputCls = "w-full h-13 px-4 rounded-xl bg-white border border-line text-[15px] outline-none focus:border-green-600 focus:ring-2 focus:ring-green-600/15 transition placeholder:text-inksoft/50";
 
+// international phone: 9–15 digits, only + / digits / spaces / dashes / parentheses (NOT UZ-only)
+function phoneOk(p) { const d = p.replace(/\D/g, ""); return d.length >= 9 && d.length <= 15 && /^\+?[\d\s\-()]+$/.test(p.trim()); }
+
 function SummaryStrip({ apt, range, lang, STR }) {
   const nights = nightsBetween(range.from, range.to);
   // pricing lives in PriceBreakdown (shown right below) — the strip is just an at-a-glance header
   return (
     <div className="flex items-center gap-3 p-3 rounded-2xl bg-white border border-line">
-      <div className="w-16 h-16 rounded-xl overflow-hidden shrink-0"><Photo tone={apt.tone} idx={0} eager showLabel={false} className="w-full h-full" /></div>
+      <div className="w-16 h-16 rounded-xl overflow-hidden shrink-0"><Photo tone={apt.tone} idx={0} eager showLabel={false} src={apt.photoUrls?.[0]} className="w-full h-full" /></div>
       <div className="min-w-0 flex-1">
-        <div className="font-serif text-[15px] leading-snug truncate">{apt.title[lang]}</div>
+        <div className="font-serif text-[15px] leading-snug truncate"><span className="text-inksoft tnum">#{apt.id}</span> · {apt.title[lang]}</div>
         <div className="text-[12.5px] text-inksoft mt-0.5">{fmtRange(range.from, range.to, lang)} · {STR[lang].night_n(nights)}</div>
       </div>
     </div>
@@ -152,9 +155,7 @@ export function Booking({ apt, range, lang, STR, device, onBack, onHome, onBooke
   function validate() {
     const e = {};
     if (!form.name.trim()) e.name = "!";
-    // international phone: 9–15 digits, only +, digits, spaces, dashes, parentheses (NOT UZ-only)
-    const digits = form.phone.replace(/\D/g, "");
-    if (digits.length < 9 || digits.length > 15 || !/^\+?[\d\s\-()]+$/.test(form.phone.trim())) e.phone = "!";
+    if (!phoneOk(form.phone)) e.phone = "!";
     setErrs(e); return Object.keys(e).length === 0;
   }
   function submit() {
@@ -212,7 +213,7 @@ export function Booking({ apt, range, lang, STR, device, onBack, onHome, onBooke
             </div>
             <Field label={STR[lang].your_name} error={errs.name && (lang === "ru" ? "Введите имя" : lang === "uz" ? "Ismingizni kiriting" : "Enter your name")}>
               <input className={inputCls + (errs.name ? " border-[#B3402E]! focus:border-[#B3402E]!" : "")} placeholder={STR[lang].name_ph} value={form.name}
-                onChange={(e) => { setForm({ ...form, name: e.target.value }); if (errs.name) setErrs((x) => ({ ...x, name: undefined })); }} />
+                onChange={(e) => { const v = e.target.value; setForm({ ...form, name: v }); if (errs.name && v.trim()) setErrs((x) => ({ ...x, name: undefined })); }} />
             </Field>
             <Field label={STR[lang].phone} help={STR[lang].phone_help} error={errs.phone && (lang === "ru" ? "9 цифр номера" : lang === "uz" ? "9 ta raqam kiriting" : "Enter 9 digits")}>
               {/* fixed "+" prefix so guests can't forget it; a bare 9-digit UZ mobile gets +998 on blur */}
@@ -220,8 +221,13 @@ export function Booking({ apt, range, lang, STR, device, onBack, onHome, onBooke
                 <span className="absolute left-4 top-1/2 -translate-y-1/2 text-inksoft font-semibold pointer-events-none">+</span>
                 <input className={inputCls + " pl-8" + (errs.phone ? " border-[#B3402E]! focus:border-[#B3402E]!" : "")} inputMode="tel" placeholder="998 90 123 45 67"
                   value={form.phone.replace(/^\+/, "")}
-                  onChange={(e) => { setForm({ ...form, phone: "+" + e.target.value.replace(/[^\d\s\-()]/g, "") }); if (errs.phone) setErrs((x) => ({ ...x, phone: undefined })); }}
-                  onBlur={() => setForm((f) => { const d = f.phone.replace(/\D/g, ""); return d.length === 9 ? { ...f, phone: "+998" + d } : f; })} />
+                  onChange={(e) => { const v = "+" + e.target.value.replace(/[^\d\s\-()]/g, ""); setForm({ ...form, phone: v }); if (errs.phone && phoneOk(v)) setErrs((x) => ({ ...x, phone: undefined })); }}
+                  onBlur={() => {
+                    const d = form.phone.replace(/\D/g, "");
+                    const norm = d.length === 9 ? "+998" + d : form.phone.trim().replace(/\s{2,}/g, " ");
+                    setForm((f) => ({ ...f, phone: norm }));
+                    if (norm.replace(/^\+/, "").trim()) setErrs((x) => ({ ...x, phone: phoneOk(norm) ? undefined : "!" })); // validate on leave; don't nag an empty field
+                  }} />
               </div>
             </Field>
             <div>
