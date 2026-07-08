@@ -202,7 +202,10 @@ export function ApartmentView({ apt, locale }: { apt: any; locale: Locale }) {
             </section>
           </div>
 
-          <aside className="lg:sticky lg:top-20 self-start">
+          {/* Sticky reserve card. It can be taller than the viewport (calendar + price breakdown),
+              so cap it to the visible height below the 80px sticky offset and let it scroll inside
+              — otherwise its bottom (the CTA) sits below the fold until the whole page is scrolled. */}
+          <aside className="lg:sticky lg:top-20 self-start lg:max-h-[calc(100dvh-6rem)] lg:overflow-y-auto lg:overscroll-contain">
             <AptReserve apt={apt} lang={locale} />
           </aside>
         </div>
