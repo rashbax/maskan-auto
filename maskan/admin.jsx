@@ -272,6 +272,11 @@ function MetaRow({ icon, label, value, href }) {
 
 function BookingDetailSheet({ booking, lang, STR, desktop, apartments, onClose, onCancel, onDelete, onShorten }) {
   const b = booking;
+  // Destructive actions are ARMED first: the footer swaps to an inline confirm (impact text +
+  // "Ortga"/"Ha, ..."), so a single (or accidental double) tap can never cancel/delete. "Ortga"
+  // is placed first so a double-tap on the arming button's spot lands on the safe button.
+  const [confirming, setConfirming] = useState(null); // null | "cancel" | "delete"
+  useEffect(() => setConfirming(null), [b?.id]);
   const apt = b ? ((apartments || []).find((a) => a.id === b.apt) || aptById(b.apt)) : null;
   const fmtDay = (iso) => {
     if (!iso) return "—";
@@ -279,9 +284,17 @@ function BookingDetailSheet({ booking, lang, STR, desktop, apartments, onClose, 
     if (isNaN(d.getTime())) return iso;
     return `${calWD[lang][(d.getDay() + 6) % 7]}, ${d.getDate()} ${calMonths[lang][d.getMonth()]}`;
   };
+  const T = (ru, uz, en) => (lang === "ru" ? ru : lang === "uz" ? uz : en);
   const st = b ? bkStatusMeta(b.status, STR, lang) : null;
   const tg = b?.tg ? b.tg.replace(/^@/, "") : "";
-  const canShorten = b && b.status === "active" && b.nights > 1 && b.source !== "booking" && onShorten;
+  // An ACTIVE OTA-origin booking is owned by the channel: a local cancel/delete would be silently
+  // reverted by the next daily Beds24 pull, so instead of the buttons we show guidance. Once it is
+  // no longer active (cancelled in the OTA and pulled), delete is allowed like any other row.
+  const isOTA = b?.source === "booking";
+  const canShorten = b && b.status === "active" && b.nights > 1 && !isOTA && onShorten;
+  const canCancel = b && b.status === "active" && !isOTA && onCancel;
+  // delete is cleanup for junk/finished rows — an active booking must be cancelled first
+  const canDelete = b && b.status !== "active" && onDelete;
   const act = "flex-1 min-w-0 h-12 rounded-2xl font-bold text-[13.5px] transition flex items-center justify-center gap-1.5";
   return (
     <Sheet open={!!b} onClose={onClose} desktop={desktop} title={b ? b.guest : ""}
@@ -293,12 +306,42 @@ function BookingDetailSheet({ booking, lang, STR, desktop, apartments, onClose, 
               {tg && <a href={`https://t.me/${tg}`} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className={`${act} border border-line bg-white text-ink hover:border-ink/30`}><Icon name="tg" size={16} />Telegram</a>}
             </div>
           )}
-          {(canShorten || (b.status === "active" && onCancel) || onDelete) && (
-            <div className="flex items-center gap-2">
-              {canShorten && <button onClick={() => onShorten(b)} className={`${act} border border-green-600/40 text-green-700 hover:bg-green-50`}><Icon name="clock" size={16} />{lang === "ru" ? "Ранний выезд" : lang === "uz" ? "Erta chiqish" : "Early checkout"}</button>}
-              {b.status === "active" && onCancel && <button onClick={() => onCancel(b)} className={`${act} bg-red-600 text-white hover:bg-red-700`}><Icon name="x" size={16} />{STR[lang].a_cancel}</button>}
-              {onDelete && <button onClick={() => onDelete(b)} aria-label={lang === "ru" ? "Удалить" : lang === "uz" ? "Oʻchirish" : "Delete"} title={lang === "ru" ? "Удалить" : lang === "uz" ? "Oʻchirish" : "Delete"} className="w-12 h-12 shrink-0 grid place-items-center rounded-2xl border border-line text-inksoft hover:text-red-600 hover:bg-red-50 transition"><Icon name="trash" size={16} /></button>}
+          {confirming ? (
+            <div className="space-y-2">
+              <div className="rounded-xl bg-red-50 border border-red-600/20 p-3 text-[12.5px] font-semibold text-red-700">
+                {confirming === "cancel"
+                  ? T("Бронь будет отменена — даты откроются на сайте и в OTA. Действие необратимо.",
+                      "Bron bekor qilinadi — kunlar saytda va OTA'larda ochiladi. Qaytarib boʻlmaydi.",
+                      "The booking will be cancelled — the dates reopen on the site and OTAs. This cannot be undone.")
+                  : T("Бронь будет удалена навсегда и исчезнет из статистики.",
+                      "Bron butunlay oʻchiriladi va statistikadan ham yoʻqoladi.",
+                      "The booking will be permanently deleted and removed from stats.")}
+              </div>
+              <div className="flex items-center gap-2">
+                <button onClick={() => setConfirming(null)} className={`${act} border border-line bg-white text-ink hover:border-ink/30`}>{T("Назад", "Ortga", "Back")}</button>
+                <button onClick={() => (confirming === "cancel" ? onCancel(b) : onDelete(b))} className={`${act} bg-red-600 text-white hover:bg-red-700`}>
+                  <Icon name={confirming === "cancel" ? "x" : "trash"} size={16} />
+                  {confirming === "cancel" ? T("Да, отменить", "Ha, bekor qilish", "Yes, cancel") : T("Да, удалить", "Ha, oʻchirish", "Yes, delete")}
+                </button>
+              </div>
             </div>
+          ) : (
+            <>
+              {b.status === "active" && isOTA && (
+                <div className="rounded-xl bg-cream border border-line p-3 text-[12.5px] text-inksoft">
+                  {T("Эта бронь пришла из OTA. Отмена выполняется в Booking.com/Beds24 — следующая синхронизация обновит её здесь.",
+                     "Bu bron OTA'dan kelgan. Bekor qilish Booking.com/Beds24'da qilinadi — keyingi sinxronizatsiya bu yerda oʻzi yangilaydi.",
+                     "This booking came from an OTA. Cancel it in Booking.com/Beds24 — the next sync will update it here.")}
+                </div>
+              )}
+              {(canShorten || canCancel || canDelete) && (
+                <div className="flex items-center gap-2">
+                  {canShorten && <button onClick={() => onShorten(b)} className={`${act} border border-green-600/40 text-green-700 hover:bg-green-50`}><Icon name="clock" size={16} />{T("Ранний выезд", "Erta chiqish", "Early checkout")}</button>}
+                  {canCancel && <button onClick={() => setConfirming("cancel")} className={`${act} bg-red-600 text-white hover:bg-red-700`}><Icon name="x" size={16} />{STR[lang].a_cancel}</button>}
+                  {canDelete && <button onClick={() => setConfirming("delete")} aria-label={T("Удалить", "Oʻchirish", "Delete")} title={T("Удалить", "Oʻchirish", "Delete")} className="w-12 h-12 shrink-0 grid place-items-center rounded-2xl border border-line text-inksoft hover:text-red-600 hover:bg-red-50 transition"><Icon name="trash" size={16} /></button>}
+                </div>
+              )}
+            </>
           )}
         </div>
       ) : null}>
@@ -1114,9 +1157,8 @@ export function Admin({ lang, STR, device, onExit, openLang, role, auth, onLogin
       window.alert(lang === "ru" ? "Не удалось отменить (Beds24)." : lang === "uz" ? "Bekor qilib boʻlmadi (Beds24)." : "Cancel failed (Beds24).");
     }
   }
+  // no window.confirm here — the detail sheet arms an inline confirm before calling this
   async function deleteFromDetail(b) {
-    const msg = lang === "ru" ? "Удалить эту бронь навсегда?" : lang === "uz" ? "Bu bronni butunlay oʻchirilsinmi?" : "Delete this booking permanently?";
-    if (!window.confirm(msg)) return;
     setBookings((arr) => arr.filter((i) => i.id !== b.id));
     setDetail(null);
     try {
