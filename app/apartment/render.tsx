@@ -33,8 +33,8 @@ const T = {
     en: "Hello! I'd like to ask about this apartment:",
   },
   descFallback: (price: number, sleeps: number) => ({
-    uz: `Toshkentda kunlik kvartira — $${price}/kecha, ${sleeps} kishigacha. Lahzada band qiling.`,
-    ru: `Посуточная квартира в Ташкенте — $${price}/ночь, до ${sleeps} гостей. Мгновенное бронирование.`,
+    uz: `Toshkentda kunlik kvartira — $${price}/sutka, ${sleeps} kishigacha. Lahzada band qiling.`,
+    ru: `Посуточная квартира в Ташкенте — $${price}/сутки, до ${sleeps} гостей. Мгновенное бронирование.`,
     en: `Daily apartment in Tashkent — $${price}/night, up to ${sleeps} guests. Instant booking.`,
   }),
 };

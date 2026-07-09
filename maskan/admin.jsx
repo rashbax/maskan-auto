@@ -145,7 +145,7 @@ function SourceBreakdown({ lang, STR, bySource, totalNights, totalRevenue }) {
                 <span className="font-bold text-[20px] tnum">${Math.round(s.revenue)}</span>
                 <span className="text-[12px] font-semibold tnum" style={{ color: c.color }}>{revShare}%</span>
               </div>
-              <div className="text-[12px] text-inksoft">{STR[lang].night_n(s.nights)} · {nightShare}% {T("ночей", "kecha", "nights")}</div>
+              <div className="text-[12px] text-inksoft">{STR[lang].night_n(s.nights)} · {nightShare}% {T("суток", "sutka", "nights")}</div>
               <div className="mt-2.5 h-1.5 rounded-full bg-black/[.06] overflow-hidden"><div className="h-full rounded-full" style={{ width: revShare + "%", background: c.color }} /></div>
             </div>
           );
@@ -449,7 +449,7 @@ function EarlyCheckoutForm({ lang, STR, b, onDone }) {
         <input type="date" value={date} min={minDate} max={maxDate} onChange={(e) => setDate(e.target.value)} className={fld + " tnum"} />
       </label>
       <div className="rounded-xl bg-cream border border-line p-3.5 text-[13.5px] space-y-1.5">
-        <div className="flex justify-between"><span className="text-inksoft">{T("Ночей", "Kechalar", "Nights")}</span><span className="font-semibold tnum">{oldNights} → {newNights}</span></div>
+        <div className="flex justify-between"><span className="text-inksoft">{T("Суток", "Sutkalar", "Nights")}</span><span className="font-semibold tnum">{oldNights} → {newNights}</span></div>
         <div className="flex justify-between"><span className="text-inksoft">{T("Новая сумма", "Yangi summa", "New total")}</span><span className="font-semibold tnum">${newTotal ?? "—"}</span></div>
         <div className="flex justify-between text-green-700 border-t border-line pt-1.5"><span className="font-semibold">{T("К возврату гостю", "Mehmonga qaytariladi", "Refund to guest")}</span><span className="font-bold tnum">${refund ?? "—"}</span></div>
       </div>
