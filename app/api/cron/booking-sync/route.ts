@@ -16,8 +16,10 @@ function tashkentToday() {
 // max-duration exit can drop it), so Vercel Cron hits this on a schedule and re-runs the IDEMPOTENT
 // effects for recent bookings that still haven't completed them (notifyOwner claims notified_at;
 // pushToBeds24 is gated by beds24_booking_id). Fail-closed on the shared secret Vercel sends.
-// Note: a 48h window deliberately bounds retries (a permanently-failing row won't loop forever); a
-// full outbox with attempt/backoff tracking is the next step if unbounded durability is needed.
+// Note: owner notifications use a 48h window (only recent bookings are worth pinging about);
+// Beds24 pushes are instead bounded by the stay still lying ahead (checkout/date ≥ today), so a
+// future stay keeps retrying until it syncs. A full outbox with attempt/backoff tracking is the
+// next step if unbounded durability is needed.
 export async function GET(req: Request) {
   if (!SECRET || req.headers.get("authorization") !== `Bearer ${SECRET}`) {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
@@ -35,13 +37,16 @@ export async function GET(req: Request) {
 
   // Only retry pushes for apartments actually mapped to Beds24 — unmapped rows are skipped by
   // pushToBeds24 anyway, and including them would let them starve the limited page.
+  // Bound by CHECKOUT ≥ today (not created_at ≥ 48h): a stay that still lies ahead must keep
+  // retrying until it syncs — otherwise a booking made before its apartment was mapped to Beds24,
+  // or one older than 48h, would strand forever. Past stays need no OTA close, so they drop out.
   const { data: toPush, error: pushErr } = beds24Enabled()
     ? await sb
         .from("bookings")
         .select("id, apartments!inner(beds24_room_id)")
         .in("source", ["website", "manual"]).eq("status", "active")
         .is("beds24_booking_id", null).not("apartments.beds24_room_id", "is", null)
-        .gte("created_at", since).order("created_at", { ascending: true }).limit(25)
+        .gte("checkout", tashkentToday()).order("checkout", { ascending: true }).limit(25)
     : { data: [] as { id: string }[], error: null };
 
   const { data: toPushBlocks, error: blockPushErr } = beds24Enabled()
