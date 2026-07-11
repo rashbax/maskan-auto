@@ -51,6 +51,34 @@ export const getApartmentFull = cache(async (id: string) => {
   };
 });
 
+// Catalog list for the server-rendered home page (the SEO layer that greets crawlers and the
+// first paint). Two queries total; covers resolved the same way the SPA does (is_cover, then sort).
+export const getApartmentsForHome = cache(async () => {
+  const sb = publicDb();
+  const [{ data: apts }, { data: photos }] = await Promise.all([
+    sb.from("apartments").select("id,title,district,price_usd,sleeps,beds,rating,reviews_count").eq("status", "active").order("id"),
+    sb.from("apartment_photos").select("apartment_id,url,sort,is_cover"),
+  ]);
+  const cover: Record<string, string> = {};
+  (photos || [])
+    .slice()
+    .sort((x, y) => (y.is_cover ? 1 : 0) - (x.is_cover ? 1 : 0) || x.sort - y.sort)
+    .forEach((p) => { cover[p.apartment_id] ??= p.url as string; });
+  return (apts || []).map((a) => ({
+    id: a.id as string,
+    title: (a.title || {}) as Record<string, string>,
+    district: a.district as string,
+    price: a.price_usd as number,
+    sleeps: (a.sleeps as number) || 1,
+    beds: (a.beds as number) || 1,
+    rating: Number(a.rating) || 0,
+    reviews: (a.reviews_count as number) || 0,
+    cover: cover[a.id as string] || null,
+  }));
+});
+
+export type HomeApartment = Awaited<ReturnType<typeof getApartmentsForHome>>[number];
+
 // Server-side fetch of one apartment + its cover photo, for SEO metadata / Open Graph.
 export const getApartmentForMeta = cache(async (id: string) => {
   const sb = publicDb();

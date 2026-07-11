@@ -44,7 +44,7 @@ function LangSheet({ open, onClose, lang, setLang, STR, desktop }) {
   );
 }
 
-export default function App() {
+export default function App({ onReady }) {
   const STR = MASKAN.STR;
   const router = useRouter();
   const [lang, setLang] = useState(() => {
@@ -73,6 +73,12 @@ export default function App() {
       .catch((e) => { console.error("getApartments failed:", e); alive && setApartments([]); });
     return () => { alive = false; };
   }, []);
+
+  // Tell the shell (AppClient) the catalog data is in — it swaps the server-rendered SEO
+  // catalog for the live app only now, so the user never sees a skeleton flash in between.
+  useEffect(() => {
+    if (apartments !== null) onReady?.();
+  }, [apartments, onReady]);
 
   // remember the chosen language across refreshes
   useEffect(() => { try { localStorage.setItem("maskan_lang", lang); } catch { /* ignore */ } }, [lang]);
