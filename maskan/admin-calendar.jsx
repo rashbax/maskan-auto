@@ -95,10 +95,15 @@ function AptHeader({ lang, STR, apt }) {
 }
 
 // ---- hover/tap popover on a booked day ----
-function BookedPopover({ lang, STR, b }) {
+function BookedPopover({ lang, STR, b, col, row }) {
   const s = SRC[b.source] || SRC.manual;
+  // Keep the fixed-width popover inside the 7-col grid so an edge day doesn't push it off-screen
+  // (the bug: a leftmost booked day clipped the card off the left edge on mobile). Anchor left/right
+  // for edge columns, center otherwise; the first week opens downward instead of into the header.
+  const hpos = col <= 1 ? "left-0" : col >= 5 ? "right-0" : "left-1/2 -translate-x-1/2";
+  const vpos = row === 0 ? "top-full mt-1.5" : "bottom-full mb-1.5";
   return (
-    <div className="absolute z-30 bottom-full left-1/2 -translate-x-1/2 mb-1.5 w-44 rounded-xl border border-line bg-white shadow-pop p-3 pointer-events-none">
+    <div className={`absolute z-30 ${vpos} ${hpos} w-44 max-w-[calc(100vw-2rem)] rounded-xl border border-line bg-white shadow-pop p-3 pointer-events-none`}>
       <span className="inline-flex items-center gap-1.5 px-2 h-5 rounded-full text-[10.5px] font-bold" style={{ color: s.color, background: s.bg }}><span className="w-1.5 h-1.5 rounded-full" style={{ background: s.color }} />{STR[lang][s.key]}</span>
       <div className="font-bold text-[13px] mt-1.5 truncate">{b.guest || "—"}</div>
       <div className="text-[11.5px] text-inksoft">{fmtRange(new Date(b.from), new Date(b.to), lang)}</div>
@@ -224,7 +229,7 @@ function Calendar({ lang, STR, apt, bookings, view, setView, draft, setDraft, co
               </button>
               {pending && <span className="absolute inset-0 rounded-lg border-2 border-dashed border-green-600 pointer-events-none" />}
               {isToday && <span className={`absolute inset-[3px] rounded-md border-2 pointer-events-none ${booked ? "border-cream" : "border-green-700"}`} />}
-              {booked && pop === k && <BookedPopover lang={lang} STR={STR} b={booking} />}
+              {booked && pop === k && <BookedPopover lang={lang} STR={STR} b={booking} col={i % 7} row={Math.floor(i / 7)} />}
             </div>
           );
         })}
