@@ -3,7 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { notifyOwner, pushToBeds24 } from "@/lib/booking-effects";
 import { directTotal } from "@/lib/pricing";
 import { oneLine } from "@/lib/sanitize";
-import { isValidPhoneNumber, parsePhoneNumber } from "libphonenumber-js";
+import { parsePhoneNumberFromString } from "libphonenumber-js";
 
 export const runtime = "nodejs";
 
@@ -58,8 +58,9 @@ export async function POST(req: Request) {
   // 10-digit +7 that actually needs 11 — a plain digit-count range let those through. Store E.164.
   const digits = phone.replace(/\D/g, "");
   const normPhone = digits.length === 9 ? "+998" + digits : "+" + digits;
-  if (!isValidPhoneNumber(normPhone)) return NextResponse.json({ error: "bad_phone" }, { status: 400 });
-  const e164 = parsePhoneNumber(normPhone).number;
+  const parsedPhone = parsePhoneNumberFromString(normPhone); // non-throwing: undefined when unparseable
+  if (!parsedPhone?.isValid()) return NextResponse.json({ error: "bad_phone" }, { status: 400 });
+  const e164 = parsedPhone.number;
 
   const sb = createAdminClient();
 

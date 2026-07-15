@@ -7,7 +7,7 @@ import { fmtRange } from "./catalog";
 import { createBooking } from "./db";
 import { fmtPrice } from "./money";
 import { directTotal, directSavings, WEBSITE_DISCOUNT_PCT } from "../lib/pricing";
-import { isValidPhoneNumber, parsePhoneNumber } from "libphonenumber-js";
+import { parsePhoneNumberFromString } from "libphonenumber-js";
 
 function Field({ label, help, error, children }) {
   return (
@@ -28,7 +28,7 @@ const inputCls = "w-full h-13 px-4 rounded-xl bg-white border border-line text-[
 function normalizePhone(p) { const d = p.replace(/\D/g, ""); return d.length === 9 ? "+998" + d : "+" + d; }
 // Valid = a real, COMPLETE number for its country — catches e.g. a 10-digit +7 that actually needs 11
 // (a plain "9–15 digits" range let those incomplete numbers through).
-function phoneOk(p) { return isValidPhoneNumber(normalizePhone(p)); }
+function phoneOk(p) { return !!parsePhoneNumberFromString(normalizePhone(p))?.isValid(); }
 
 function SummaryStrip({ apt, range, lang, STR }) {
   const nights = nightsBetween(range.from, range.to);
@@ -228,8 +228,8 @@ export function Booking({ apt, range, lang, STR, device, onBack, onHome, onBooke
                   onChange={(e) => { const v = "+" + e.target.value.replace(/[^\d\s\-()]/g, ""); setForm({ ...form, phone: v }); if (errs.phone && phoneOk(v)) setErrs((x) => ({ ...x, phone: undefined })); }}
                   onBlur={() => {
                     if (!form.phone.replace(/^\+/, "").trim()) return; // untouched → don't nag
-                    const norm = normalizePhone(form.phone);
-                    if (isValidPhoneNumber(norm)) { setForm((f) => ({ ...f, phone: parsePhoneNumber(norm).formatInternational() })); setErrs((x) => ({ ...x, phone: undefined })); } // pretty + normalize
+                    const parsed = parsePhoneNumberFromString(normalizePhone(form.phone));
+                    if (parsed?.isValid()) { setForm((f) => ({ ...f, phone: parsed.formatInternational() })); setErrs((x) => ({ ...x, phone: undefined })); } // pretty + normalize
                     else setErrs((x) => ({ ...x, phone: "!" })); // validate on leave
                   }} />
               </div>
