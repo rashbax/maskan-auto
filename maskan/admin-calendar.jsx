@@ -214,7 +214,7 @@ function Calendar({ lang, STR, apt, bookings, view, setView, draft, setDraft, co
             <div key={i} className="relative aspect-square">
               <button
                 data-day={!past && !booked ? k : undefined}
-                disabled={past}
+                disabled={past && !booked}
                 onPointerDown={desktop && !booked ? (e) => onCellDown(k, e) : undefined}
                 onClick={() => {
                   if (booked) { setPop((p) => (p === k ? null : k)); return; }
