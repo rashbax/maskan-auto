@@ -7,6 +7,7 @@ import { fmtRange } from "./catalog";
 import { createBooking } from "./db";
 import { fmtPrice } from "./money";
 import { directTotal, directSavings, WEBSITE_DISCOUNT_PCT } from "../lib/pricing";
+import { isValidPhoneNumber, parsePhoneNumber } from "libphonenumber-js";
 
 function Field({ label, help, error, children }) {
   return (
@@ -23,8 +24,11 @@ function Field({ label, help, error, children }) {
 
 const inputCls = "w-full h-13 px-4 rounded-xl bg-white border border-line text-[15px] outline-none focus:border-green-600 focus:ring-2 focus:ring-green-600/15 transition placeholder:text-inksoft/50";
 
-// international phone: 9–15 digits, only + / digits / spaces / dashes / parentheses (NOT UZ-only)
-function phoneOk(p) { const d = p.replace(/\D/g, ""); return d.length >= 9 && d.length <= 15 && /^\+?[\d\s\-()]+$/.test(p.trim()); }
+// A bare 9-digit input is an Uzbek mobile (gets +998); otherwise keep the typed country code.
+function normalizePhone(p) { const d = p.replace(/\D/g, ""); return d.length === 9 ? "+998" + d : "+" + d; }
+// Valid = a real, COMPLETE number for its country — catches e.g. a 10-digit +7 that actually needs 11
+// (a plain "9–15 digits" range let those incomplete numbers through).
+function phoneOk(p) { return isValidPhoneNumber(normalizePhone(p)); }
 
 function SummaryStrip({ apt, range, lang, STR }) {
   const nights = nightsBetween(range.from, range.to);
@@ -215,7 +219,7 @@ export function Booking({ apt, range, lang, STR, device, onBack, onHome, onBooke
               <input className={inputCls + (errs.name ? " border-[#B3402E]! focus:border-[#B3402E]!" : "")} placeholder={STR[lang].name_ph} value={form.name}
                 onChange={(e) => { const v = e.target.value; setForm({ ...form, name: v }); if (errs.name && v.trim()) setErrs((x) => ({ ...x, name: undefined })); }} />
             </Field>
-            <Field label={STR[lang].phone} help={STR[lang].phone_help} error={errs.phone && (lang === "ru" ? "9 цифр номера" : lang === "uz" ? "9 ta raqam kiriting" : "Enter 9 digits")}>
+            <Field label={STR[lang].phone} help={STR[lang].phone_help} error={errs.phone && (lang === "ru" ? "неверный номер" : lang === "uz" ? "notoʻgʻri raqam" : "invalid number")}>
               {/* fixed "+" prefix so guests can't forget it; a bare 9-digit UZ mobile gets +998 on blur */}
               <div className="relative">
                 <span className="absolute left-4 top-1/2 -translate-y-1/2 text-inksoft font-semibold pointer-events-none">+</span>
@@ -223,10 +227,10 @@ export function Booking({ apt, range, lang, STR, device, onBack, onHome, onBooke
                   value={form.phone.replace(/^\+/, "")}
                   onChange={(e) => { const v = "+" + e.target.value.replace(/[^\d\s\-()]/g, ""); setForm({ ...form, phone: v }); if (errs.phone && phoneOk(v)) setErrs((x) => ({ ...x, phone: undefined })); }}
                   onBlur={() => {
-                    const d = form.phone.replace(/\D/g, "");
-                    const norm = d.length === 9 ? "+998" + d : form.phone.trim().replace(/\s{2,}/g, " ");
-                    setForm((f) => ({ ...f, phone: norm }));
-                    if (norm.replace(/^\+/, "").trim()) setErrs((x) => ({ ...x, phone: phoneOk(norm) ? undefined : "!" })); // validate on leave; don't nag an empty field
+                    if (!form.phone.replace(/^\+/, "").trim()) return; // untouched → don't nag
+                    const norm = normalizePhone(form.phone);
+                    if (isValidPhoneNumber(norm)) { setForm((f) => ({ ...f, phone: parsePhoneNumber(norm).formatInternational() })); setErrs((x) => ({ ...x, phone: undefined })); } // pretty + normalize
+                    else setErrs((x) => ({ ...x, phone: "!" })); // validate on leave
                   }} />
               </div>
             </Field>

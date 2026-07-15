@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { notifyOwner, pushToBeds24 } from "@/lib/booking-effects";
 import { directTotal } from "@/lib/pricing";
 import { oneLine } from "@/lib/sanitize";
+import { isValidPhoneNumber, parsePhoneNumber } from "libphonenumber-js";
 
 export const runtime = "nodejs";
 
@@ -53,8 +54,12 @@ export async function POST(req: Request) {
   if (from < todayTashkent) return NextResponse.json({ error: "past_date" }, { status: 400 });
   if (from > horizon) return NextResponse.json({ error: "too_far" }, { status: 400 });
   if (!guestName) return NextResponse.json({ error: "name_required" }, { status: 400 });
+  // Validate a real, COMPLETE number (a bare 9-digit input is an Uzbek mobile). Rejects e.g. a
+  // 10-digit +7 that actually needs 11 — a plain digit-count range let those through. Store E.164.
   const digits = phone.replace(/\D/g, "");
-  if (digits.length < 9 || digits.length > 15) return NextResponse.json({ error: "bad_phone" }, { status: 400 });
+  const normPhone = digits.length === 9 ? "+998" + digits : "+" + digits;
+  if (!isValidPhoneNumber(normPhone)) return NextResponse.json({ error: "bad_phone" }, { status: 400 });
+  const e164 = parsePhoneNumber(normPhone).number;
 
   const sb = createAdminClient();
 
@@ -90,7 +95,7 @@ export async function POST(req: Request) {
     apartment_id: apartmentId,
     user_id: userId,
     guest_name: guestName,
-    phone,
+    phone: e164,
     telegram,
     messenger,
     adults: a,
