@@ -215,6 +215,7 @@ export async function getAllBookings() {
     adults: b.adults,
     children: b.children,
     total: b.total_usd,
+    commission: b.commission_usd != null ? Number(b.commission_usd) : 0,
     source: b.source,
     status: b.status,
     email: b.email || "",
@@ -457,6 +458,51 @@ export async function savePropertyFile(f) {
   const { data, error } = await sb.from("property_files").upsert(row).select("id").single();
   if (error) throw error;
   return data.id;
+}
+
+// ---------- admin: expenses (finance journal; admin-only RLS) ----------
+export async function getExpenses() {
+  const sb = createClient();
+  const { data, error } = await sb
+    .from("expenses")
+    .select("*")
+    .order("date", { ascending: false })
+    .order("created_at", { ascending: false })
+    .limit(1000);
+  if (error) return [];
+  return (data || []).map((e) => ({
+    id: e.id,
+    apartmentId: e.apartment_id || null,
+    date: e.date,
+    category: e.category,
+    amount: Number(e.amount) || 0,
+    currency: e.currency || "UZS",
+    note: e.note || "",
+  }));
+}
+
+export async function addExpense({ apartmentId, date, category, amount, currency, note }) {
+  const sb = createClient();
+  const { data, error } = await sb
+    .from("expenses")
+    .insert({
+      apartment_id: apartmentId || null,
+      date,
+      category,
+      amount,
+      currency: currency === "USD" ? "USD" : "UZS",
+      note: note || null,
+    })
+    .select("id")
+    .single();
+  if (error) throw error;
+  return data.id;
+}
+
+export async function deleteExpense(id) {
+  const sb = createClient();
+  const { error } = await sb.from("expenses").delete().eq("id", id);
+  if (error) throw error;
 }
 
 // ---------- admin: suppliers (name / product / contact; admin-only RLS) ----------

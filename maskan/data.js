@@ -248,7 +248,7 @@ const STR = {
     a_hidden: "Скрыт", host_reply: "Ответ хозяина", a_hide_reason: "Причина (для журнала)", a_hide_reasons: ["Спам", "Оскорбления", "Не по теме", "Личные данные"],
     a_audit: "Журнал действий", cannot_edit: "Текст отзыва редактировать нельзя",
     // --- property file (admin-only internal ops) + suppliers ---
-    a_pfile: "Паспорт квартиры", a_suppliers: "Поставщики",
+    a_pfile: "Паспорт квартиры", a_suppliers: "Поставщики", a_finance: "Финансы",
     pf_internal: "Внутренние данные — гостям не показываются", pf_add: "Добавить паспорт",
     pf_badge: "Паспорт", pf_draft: "Не заполнен", pf_standalone: "Отдельный",
     pf_new_hint: "Паспорт можно создать ещё до публичного объявления.", pf_apt_name: "Название квартиры",
@@ -329,7 +329,7 @@ const STR = {
     a_hidden: "Hidden", host_reply: "Host reply", a_hide_reason: "Reason (for the log)", a_hide_reasons: ["Spam", "Abuse", "Off-topic", "Personal data"],
     a_audit: "Audit log", cannot_edit: "Review text can’t be edited",
     // --- property file (admin-only internal ops) + suppliers ---
-    a_pfile: "Property file", a_suppliers: "Suppliers",
+    a_pfile: "Property file", a_suppliers: "Suppliers", a_finance: "Finance",
     pf_internal: "Internal data — never shown to guests", pf_add: "Add property file",
     pf_badge: "File", pf_draft: "Not filled", pf_standalone: "Standalone",
     pf_new_hint: "You can create a file before the public listing exists.", pf_apt_name: "Apartment name",
@@ -410,7 +410,7 @@ const STR = {
     a_hidden: "Yashirilgan", host_reply: "Uy egasi javobi", a_hide_reason: "Sabab (jurnal uchun)", a_hide_reasons: ["Spam", "Haqorat", "Mavzudan tashqari", "Shaxsiy maʼlumot"],
     a_audit: "Amallar jurnali", cannot_edit: "Sharh matnini tahrirlab boʻlmaydi",
     // --- property file (admin-only internal ops) + suppliers ---
-    a_pfile: "Kvartira pasporti", a_suppliers: "Taʼminotchilar",
+    a_pfile: "Kvartira pasporti", a_suppliers: "Taʼminotchilar", a_finance: "Moliya",
     pf_internal: "Ichki maʼlumot — mehmonlarga hech qachon koʻrsatilmaydi", pf_add: "Pasport qoʻshish",
     pf_badge: "Pasport", pf_draft: "Toʻldirilmagan", pf_standalone: "Mustaqil",
     pf_new_hint: "Pasportni eʼlon paydo boʻlishidan oldin ham yaratish mumkin.", pf_apt_name: "Kvartira nomi",

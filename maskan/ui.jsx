@@ -47,6 +47,7 @@ const PATHS = {
   clipboard: "M9 3h6a1 1 0 0 1 1 1v1a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z M8 5H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2",
   truck: "M3 6h11v9H3z M14 9h4l3 3v3h-7V9z M7 19a2 2 0 1 0 0-4 2 2 0 0 0 0 4z M18 19a2 2 0 1 0 0-4 2 2 0 0 0 0 4z",
   pencil: "M12 20h9 M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z",
+  money: "M2 7h20v10H2z M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z M5.5 12h.01 M18.5 12h.01",
 };
 
 export function Icon({ name, size = 22, sw = 1.6, className = "", fill = "none" }) {

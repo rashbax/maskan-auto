@@ -10,6 +10,7 @@ import { MapPicker } from "./maps";
 import { TelegramLoginButton } from "./telegram-button";
 import { PropertyFilesSection } from "./property-file";
 import { SuppliersSection } from "./suppliers";
+import { FinanceSection } from "./finance";
 import { CalManager } from "./admin-calendar";
 
 const SRC = {
@@ -1107,7 +1108,7 @@ function AdminGate({ lang, STR, onLogin, onExit }) {
 export function Admin({ lang, STR, device, onExit, openLang, role, auth, onLogin }) {
   const [tab, setTab] = useState(() => {
     const parts = (typeof window !== "undefined" ? (window.location.hash || "") : "").replace(/^#/, "").split("/");
-    return parts[0] === "admin" && ["dash", "list", "cal", "book", "reviews", "pfile", "suppliers"].includes(parts[1]) ? parts[1] : "dash";
+    return parts[0] === "admin" && ["dash", "list", "cal", "book", "fin", "reviews", "pfile", "suppliers"].includes(parts[1]) ? parts[1] : "dash";
   });
   const [editId, setEditId] = useState(null);
   const [apts, setApts] = useState([]);
@@ -1124,7 +1125,7 @@ export function Admin({ lang, STR, device, onExit, openLang, role, auth, onLogin
     const onPop = (e) => {
       const parts = (window.location.hash || "").replace(/^#/, "").split("/");
       if (parts[0] !== "admin") return; // leaving admin — the App-level handler switches screens
-      setTab(["dash", "list", "cal", "book", "reviews", "pfile", "suppliers"].includes(parts[1]) ? parts[1] : "dash");
+      setTab(["dash", "list", "cal", "book", "fin", "reviews", "pfile", "suppliers"].includes(parts[1]) ? parts[1] : "dash");
       setEditId((e.state && e.state.editId) || null);
     };
     window.addEventListener("popstate", onPop);
@@ -1186,11 +1187,12 @@ export function Admin({ lang, STR, device, onExit, openLang, role, auth, onLogin
     { k: "list", label: STR[lang].a_listings, icon: "home" },
     { k: "cal", label: STR[lang].a_calendar, icon: "cal" },
     { k: "book", label: STR[lang].a_bookings, icon: "list" },
+    { k: "fin", label: STR[lang].a_finance, icon: "money" },
     { k: "reviews", label: STR[lang].reviews_title, icon: "star" },
     { k: "pfile", label: STR[lang].a_pfile, icon: "clipboard" },
     { k: "suppliers", label: STR[lang].a_suppliers, icon: "truck" },
   ];
-  const titles = { dash: STR[lang].a_dashboard, list: STR[lang].a_listings, cal: STR[lang].a_calendar, book: STR[lang].a_bookings, reviews: STR[lang].a_moderate, pfile: STR[lang].a_pfile, suppliers: STR[lang].a_suppliers };
+  const titles = { dash: STR[lang].a_dashboard, list: STR[lang].a_listings, cal: STR[lang].a_calendar, book: STR[lang].a_bookings, fin: STR[lang].a_finance, reviews: STR[lang].a_moderate, pfile: STR[lang].a_pfile, suppliers: STR[lang].a_suppliers };
 
   return (
     <div className="h-[100dvh] overflow-hidden bg-canvas flex relative">
@@ -1230,6 +1232,7 @@ export function Admin({ lang, STR, device, onExit, openLang, role, auth, onLogin
             : tab === "dash" ? <Dashboard lang={lang} STR={STR} bookings={bookings} apartments={apts} onOpenDetail={setDetail} />
             : tab === "list" ? <Listings lang={lang} STR={STR} onEdit={goEdit} apartments={apts} />
             : tab === "cal" ? <CalManager lang={lang} STR={STR} apartments={apts} bookings={bookings} device={device} />
+            : tab === "fin" ? <FinanceSection lang={lang} STR={STR} apartments={apts} bookings={bookings} device={device} />
             : tab === "reviews" ? <ReviewsModeration lang={lang} STR={STR} apartments={apts} />
             : tab === "pfile" ? <PropertyFilesSection lang={lang} STR={STR} apartments={apts} />
             : tab === "suppliers" ? <SuppliersSection lang={lang} STR={STR} />

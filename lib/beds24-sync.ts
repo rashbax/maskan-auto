@@ -25,6 +25,7 @@ type ExistingBooking = {
   checkout: string;
   nights: number | null;
   total_usd: number | null;
+  commission_usd: number | null;
   source: string;
   status: string;
   beds24_booking_id: string | null;
@@ -392,10 +393,18 @@ export async function syncBeds24Bookings(opts: { from?: string; to?: string; boo
 
     const nights = nightsBetween(checkin!, checkout!);
     const status = statusOf(b);
-    // Price in USD from the listing (price_usd * nights). The Beds24 price comes in the booking's
-    // own currency (often UZS) and is usually absent, so we don't trust it for total_usd; fall back
-    // to it only when the apartment has no listing price.
-    const total_usd = apt.price_usd != null ? Math.round(apt.price_usd * nights) : totalUsd(b);
+    // Money: with channel price import enabled in Beds24, OTA bookings arrive with the channel's
+    // REAL gross in the property currency (all our properties are USD) plus the channel commission.
+    // Prefer that for total_usd; fall back to the listing-derived estimate (price_usd × nights)
+    // when the payload has no usable price — our own pushed bookings and cancelled rows carry
+    // price=0. Owned rows (website/manual) are shielded from all of this by priceField below.
+    const payloadPrice = totalUsd(b);
+    const total_usd =
+      payloadPrice != null && payloadPrice > 0
+        ? Math.round(payloadPrice)
+        : apt.price_usd != null
+          ? Math.round(apt.price_usd * nights)
+          : null;
     const base = {
       apartment_id: apt.id,
       checkin: checkin!,
@@ -404,7 +413,9 @@ export async function syncBeds24Bookings(opts: { from?: string; to?: string; boo
       total_usd,
       status,
     };
-    // OTA-origin guest/contact/party fields (now available with the bookings-personal token scope)
+    // OTA-origin guest/contact/party fields (now available with the bookings-personal token scope).
+    // commission_usd rides along here so it is only ever written for OTA-source rows.
+    const commission = num(b.commission);
     const otaFields = {
       guest_name: guestName(b),
       phone: phone(b),
@@ -412,11 +423,12 @@ export async function syncBeds24Bookings(opts: { from?: string; to?: string; boo
       adults: partyAdults(b),
       children: partyChildren(b),
       ota_reference: otaReference(b),
+      commission_usd: commission != null && commission > 0 ? commission : null,
     };
 
     const { data: existing, error: existingErr } = await sb
       .from("bookings")
-      .select("id,apartment_id,guest_name,phone,email,adults,children,ota_reference,checkin,checkout,nights,total_usd,source,status,beds24_booking_id")
+      .select("id,apartment_id,guest_name,phone,email,adults,children,ota_reference,checkin,checkout,nights,total_usd,commission_usd,source,status,beds24_booking_id")
       .eq("beds24_booking_id", b24Id)
       .maybeSingle();
 
@@ -430,7 +442,7 @@ export async function syncBeds24Bookings(opts: { from?: string; to?: string; boo
       const e = existing as ExistingBooking;
       // Bookings authored in Maskan (website + manual) treat Beds24 as a downstream mirror: reflect
       // date/status changes but never let the OTA payload clobber the locally-entered guest info or
-      // price (the Beds24 total is in the channel's own currency; the manual total is admin-set).
+      // price (the manual/site total is authored here; our own pushed rows carry price=0 anyway).
       const owned = e.source === "website" || e.source === "manual";
       const guestFields = owned ? {} : otaFields;
       const priceField = owned ? { total_usd: e.total_usd } : {};
