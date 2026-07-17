@@ -59,15 +59,28 @@ export function getProperties() {
   return b24<unknown>("/properties?includeAllRooms=true");
 }
 
+// Beds24 pages /bookings at 100 rows; a busy window would otherwise silently truncate there
+// (verified live: nextPageExists=true past page 2). Bounded so a runaway response can't spin
+// the cron past its time budget (~1s/page; the daily window is a handful of pages at most).
+const MAX_BOOKING_PAGES = 20;
+
 // INBOUND: bookings changed since a timestamp, for the periodic pull. Params are passed through
-// to Beds24 (e.g. { propertyId, roomId, modifiedFrom, arrivalFrom, departureTo }).
-export function getBookings(params: Record<string, string | string[]>) {
+// to Beds24 (e.g. { propertyId, roomId, modifiedFrom, arrivalFrom, departureTo }). Follows
+// `pages.nextPageExists` and aggregates every page so the caller sees the FULL window.
+export async function getBookings(params: Record<string, string | string[]>) {
   const qs = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
     if (Array.isArray(value)) value.forEach((v) => qs.append(key, v));
     else qs.set(key, value);
   }
-  return b24<{ success?: boolean; data?: Beds24Booking[] }>(`/bookings?${qs}`);
+  const all: Beds24Booking[] = [];
+  for (let page = 1; page <= MAX_BOOKING_PAGES; page++) {
+    qs.set("page", String(page));
+    const res = await b24<{ success?: boolean; data?: Beds24Booking[]; pages?: { nextPageExists?: boolean } }>(`/bookings?${qs}`);
+    all.push(...(res.data || []));
+    if (!res.pages?.nextPageExists) break;
+  }
+  return { success: true, data: all };
 }
 
 // OUTBOUND: create/update bookings. Beds24 accepts an array; including `id` updates an existing row.
