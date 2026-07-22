@@ -53,7 +53,27 @@ function overlapNights(from, to, ci, co) {
   return Math.max(0, Math.round((Date.parse(e) - Date.parse(s)) / DAY));
 }
 
+// The ONE proration rule: a booking's in-window share of its stay (null when it doesn't touch
+// the window). Both the P&L and the trend go through this so the money model can't drift.
+function stayShare(b, from, to) {
+  const bNights = b.nights || Math.round((Date.parse(b.to) - Date.parse(b.from)) / DAY) || 1;
+  const inP = overlapNights(from, to, b.from, b.to);
+  return inP ? { inP, frac: inP / bNights } : null;
+}
+
 const num = (v) => (v === "" || v == null ? 0 : Number(v) || 0);
+
+// labels shared verbatim between the desktop table and the mobile cards — one triple each,
+// so a copy fix can't drift between viewports
+const LBL = {
+  revenue: { ru: "Доход", uz: "Tushum", en: "Revenue" },
+  expenses: { ru: "Расходы", uz: "Xarajat", en: "Expenses" },
+  profit: { ru: "Прибыль", uz: "Foyda", en: "Profit" },
+  nights: { ru: "Ночей", uz: "Kecha", en: "Nights" },
+  occ: { ru: "Загрузка", uz: "Bandlik", en: "Occ." },
+  avgNight: { ru: "Ср./ночь", uz: "Oʻrt./kecha", en: "Avg/night" },
+  total: { ru: "Итого", uz: "Jami", en: "Total" },
+};
 
 // small stat used inside the mobile apartment cards
 function AptStat({ label, children }) {
@@ -65,7 +85,7 @@ function AptStat({ label, children }) {
   );
 }
 
-export function FinanceSection({ lang, STR, apartments, bookings, device }) {
+export function FinanceSection({ lang, apartments, bookings, device }) {
   const T = (ru, uz, en) => (lang === "ru" ? ru : lang === "uz" ? uz : en);
   const desktop = device === "desktop";
   const [preset, setPreset] = useState("this");
@@ -95,23 +115,20 @@ export function FinanceSection({ lang, STR, apartments, bookings, device }) {
   const periodDays = Math.round((Date.parse(to) - Date.parse(from)) / DAY);
 
   const calc = useMemo(() => {
-    const perApt = {}; // aptId -> { net, gross, commission, nights, rent, hoa, exp }
-    const row = (id) => (perApt[id] ||= { net: 0, gross: 0, commission: 0, nights: 0, rent: 0, hoa: 0, exp: 0 });
-    const bySource = { website: 0, manual: 0, booking: 0 };
+    const perApt = {}; // aptId -> { net, commission, nights, rent, hoa, exp }
+    const row = (id) => (perApt[id] ||= { net: 0, commission: 0, nights: 0, rent: 0, hoa: 0, exp: 0 });
+    const bySource = { website: 0, manual: 0, booking: 0, airbnb: 0 };
 
     for (const b of bookings || []) {
       if (b.status === "cancelled") continue;
-      const bNights = b.nights || Math.round((Date.parse(b.to) - Date.parse(b.from)) / DAY) || 1;
-      const inP = overlapNights(from, to, b.from, b.to);
-      if (!inP) continue;
-      const frac = inP / bNights;
-      const gross = (b.total || 0) * frac;
-      const commission = (b.commission || 0) * frac;
+      const s = stayShare(b, from, to);
+      if (!s) continue;
+      const gross = (b.total || 0) * s.frac;
+      const commission = (b.commission || 0) * s.frac;
       const r = row(b.apt);
-      r.gross += gross;
       r.commission += commission;
       r.net += gross - commission;
-      r.nights += inP;
+      r.nights += s.inP;
       if (bySource[b.source] != null) bySource[b.source] += gross - commission;
     }
 
@@ -135,6 +152,9 @@ export function FinanceSection({ lang, STR, apartments, bookings, device }) {
       const cost = r.rent + r.hoa + r.exp;
       r.cost = cost;
       r.profit = r.net - cost;
+      // derived display fields computed ONCE so the table and mobile cards can't drift
+      r.occ = r.nights ? Math.min(100, (r.nights / periodDays) * 100) : null;
+      r.adr = r.nights ? r.net / r.nights : null;
       total.net += r.net;
       total.nights += r.nights;
       total.cost += cost;
@@ -154,9 +174,8 @@ export function FinanceSection({ lang, STR, apartments, bookings, device }) {
       let net = 0;
       for (const b of bookings || []) {
         if (b.status === "cancelled") continue;
-        const bNights = b.nights || Math.round((Date.parse(b.to) - Date.parse(b.from)) / DAY) || 1;
-        const inP = overlapNights(mFrom, mTo, b.from, b.to);
-        if (inP) net += ((b.total || 0) - (b.commission || 0)) * (inP / bNights);
+        const s = stayShare(b, mFrom, mTo);
+        if (s) net += ((b.total || 0) - (b.commission || 0)) * s.frac;
       }
       months.push({ label: calMonths[lang][m].slice(0, 3), net });
     }
@@ -188,14 +207,23 @@ export function FinanceSection({ lang, STR, apartments, bookings, device }) {
   const td = "px-3 py-3 text-[13.5px] whitespace-nowrap tnum";
   const tdR = `${td} text-right`;
 
-  // rows: apartments in catalog order, then the general row when it has expenses
+  // rows: apartments in catalog order, then any id the apartments prop doesn't know (e.g. a
+  // hidden listing that still has period bookings — totals include it, so a row must too,
+  // keeping Total always equal to the sum of visible rows), then the general-expenses row
   const rowIds = [
     ...apartments.map((a) => a.id).filter((id) => calc.perApt[id]),
+    ...Object.keys(calc.perApt).filter((id) => id !== "__general" && !apartments.some((a) => a.id === id)).sort(),
     ...(calc.perApt.__general ? ["__general"] : []),
   ];
 
   const periodExpenses = (expenses || []).filter((e) => e.date >= from && e.date < to);
   const loss = calc.total.profit < -0.5;
+  // apartments whose rent is already auto-counted from the property file — the expense form
+  // warns before a manual "rent" entry subtracts the same rent a second time
+  const rentAutoIds = useMemo(
+    () => new Set((pfiles || []).filter((f) => f.apartmentId && num(f.rentAmount) > 0).map((f) => f.apartmentId)),
+    [pfiles],
+  );
 
   return (
     <div className="space-y-5 pb-8">
@@ -219,7 +247,7 @@ export function FinanceSection({ lang, STR, apartments, bookings, device }) {
         {/* hero — profit is the answer to "am I making money?" */}
         <div className={`rounded-2xl p-5 flex flex-col justify-between min-h-[132px] ${loss ? "bg-red-600" : "bg-green-700"} text-cream`}>
           <div className="flex items-center justify-between gap-3">
-            <span className="text-[11px] font-bold uppercase tracking-wide text-cream/75">{T("Прибыль", "Foyda", "Profit")}</span>
+            <span className="text-[11px] font-bold uppercase tracking-wide text-cream/75">{LBL.profit[lang]}</span>
             {margin != null && (
               <span className="text-[12px] font-bold tnum text-cream/85 bg-cream/15 rounded-full px-2 py-0.5">
                 {margin.toFixed(0)}% {T("маржа", "marja", "margin")}
@@ -247,7 +275,8 @@ export function FinanceSection({ lang, STR, apartments, bookings, device }) {
         <span className="text-inksoft font-semibold">{T("Источники:", "Manbalar:", "Sources:")}</span>
         <span className="inline-flex items-center gap-1.5 h-8 px-3 rounded-full bg-green-50 text-green-700 font-bold tnum">{T("Сайт", "Sayt", "Website")} · {fmt(calc.bySource.website)}</span>
         <span className="inline-flex items-center gap-1.5 h-8 px-3 rounded-full bg-cream border border-line font-bold tnum">{T("Вручную", "Qoʻlda", "Manual")} · {fmt(calc.bySource.manual)}</span>
-        <span className="inline-flex items-center gap-1.5 h-8 px-3 rounded-full bg-blue-50 text-blue-700 font-bold tnum">OTA · {fmt(calc.bySource.booking)}</span>
+        <span className="inline-flex items-center gap-1.5 h-8 px-3 rounded-full bg-blue-50 text-blue-700 font-bold tnum">Booking.com · {fmt(calc.bySource.booking)}</span>
+        <span className="inline-flex items-center gap-1.5 h-8 px-3 rounded-full font-bold tnum" style={{ background: "#FBE9E8", color: "#E0565B" }}>Airbnb · {fmt(calc.bySource.airbnb)}</span>
       </div>
 
       {/* —— per-apartment: dense table on desktop, stacked cards on mobile —— */}
@@ -263,13 +292,13 @@ export function FinanceSection({ lang, STR, apartments, bookings, device }) {
             <thead className="bg-cream/40 border-b border-line">
               <tr>
                 <th className={thL}>{T("Квартира", "Kvartira", "Apartment")}</th>
-                <th className={thR}>{T("Доход", "Tushum", "Revenue")}</th>
-                <th className={thR}>{T("Ночей", "Kecha", "Nights")}</th>
-                <th className={thR}>{T("Загрузка", "Bandlik", "Occ.")}</th>
-                <th className={thR}>{T("Ср./ночь", "Oʻrt./kecha", "Avg/night")}</th>
+                <th className={thR}>{LBL.revenue[lang]}</th>
+                <th className={thR}>{LBL.nights[lang]}</th>
+                <th className={thR}>{LBL.occ[lang]}</th>
+                <th className={thR}>{LBL.avgNight[lang]}</th>
                 <th className={thR}>{T("Аренда+ТСЖ", "Ijara+TSJ", "Rent+HOA")}</th>
-                <th className={thR}>{T("Расходы", "Xarajat", "Expenses")}</th>
-                <th className={thR}>{T("Прибыль", "Foyda", "Profit")}</th>
+                <th className={thR}>{LBL.expenses[lang]}</th>
+                <th className={thR}>{LBL.profit[lang]}</th>
               </tr>
             </thead>
             <tbody>
@@ -280,8 +309,8 @@ export function FinanceSection({ lang, STR, apartments, bookings, device }) {
                     <td className="px-3 py-3 text-[13.5px] font-semibold max-w-[260px] overflow-hidden text-ellipsis">{id !== "__general" && <span className="text-inksoft font-normal tnum">{id} · </span>}{aptName(id)}</td>
                     <td className={tdR}>{fmt(r.net)}{r.commission > 0.5 && <span className="text-[11px] text-inksoft"> ({T("комиссия", "komissiya", "fee")} {fmt(r.commission)})</span>}</td>
                     <td className={tdR}>{r.nights || "—"}</td>
-                    <td className={tdR}>{r.nights ? `${Math.min(100, (r.nights / periodDays) * 100).toFixed(0)}%` : "—"}</td>
-                    <td className={tdR}>{r.nights ? fmt(r.net / r.nights) : "—"}</td>
+                    <td className={tdR}>{r.occ != null ? `${r.occ.toFixed(0)}%` : "—"}</td>
+                    <td className={tdR}>{r.adr != null ? fmt(r.adr) : "—"}</td>
                     <td className={tdR}>{r.rent + r.hoa > 0.5 ? fmt(r.rent + r.hoa) : "—"}</td>
                     <td className={tdR}>{r.exp > 0.5 ? fmt(r.exp) : "—"}</td>
                     <td className={`${tdR} font-bold ${r.profit < -0.5 ? "text-red-600" : "text-green-700"}`}>{fmt(r.profit)}</td>
@@ -292,7 +321,7 @@ export function FinanceSection({ lang, STR, apartments, bookings, device }) {
             {rowIds.length > 1 && (
               <tfoot className="border-t border-line bg-cream/50">
                 <tr>
-                  <td className={`${td} font-bold`}>{T("Итого", "Jami", "Total")}</td>
+                  <td className={`${td} font-bold`}>{LBL.total[lang]}</td>
                   <td className={`${tdR} font-bold`}>{fmt(calc.total.net)}</td>
                   <td className={`${tdR} font-bold`}>{calc.total.nights}</td>
                   <td className={tdR}>{occupancy.toFixed(0)}%</td>
@@ -316,22 +345,22 @@ export function FinanceSection({ lang, STR, apartments, bookings, device }) {
                 </div>
                 <div className="mt-3 grid grid-cols-3 rounded-xl border border-line overflow-hidden text-center">
                   <div className="p-2.5">
-                    <div className="text-[10px] font-bold uppercase tracking-wide text-inksoft">{T("Доход", "Tushum", "Revenue")}</div>
+                    <div className="text-[10px] font-bold uppercase tracking-wide text-inksoft">{LBL.revenue[lang]}</div>
                     <div className="text-[15px] font-semibold tnum mt-1">{fmt(r.net)}</div>
                   </div>
                   <div className="p-2.5 border-x border-line">
-                    <div className="text-[10px] font-bold uppercase tracking-wide text-inksoft">{T("Расходы", "Xarajat", "Costs")}</div>
+                    <div className="text-[10px] font-bold uppercase tracking-wide text-inksoft">{LBL.expenses[lang]}</div>
                     <div className="text-[15px] font-semibold tnum mt-1">{r.cost > 0.5 ? fmt(r.cost) : "—"}</div>
                   </div>
                   <div className={`p-2.5 ${rowLoss ? "bg-red-600/5" : "bg-green-50"}`}>
-                    <div className="text-[10px] font-bold uppercase tracking-wide text-inksoft">{T("Прибыль", "Foyda", "Profit")}</div>
+                    <div className="text-[10px] font-bold uppercase tracking-wide text-inksoft">{LBL.profit[lang]}</div>
                     <div className={`text-[15px] font-bold tnum mt-1 ${rowLoss ? "text-red-600" : "text-green-700"}`}>{fmt(r.profit)}</div>
                   </div>
                 </div>
                 <div className="mt-3 grid grid-cols-3 gap-2">
-                  <AptStat label={T("Ночей", "Kecha", "Nights")}>{r.nights || "—"}</AptStat>
-                  <AptStat label={T("Загрузка", "Bandlik", "Occ.")}>{r.nights ? `${Math.min(100, (r.nights / periodDays) * 100).toFixed(0)}%` : "—"}</AptStat>
-                  <AptStat label={T("Ср./ночь", "Oʻrt./kecha", "Avg/night")}>{r.nights ? fmt(r.net / r.nights) : "—"}</AptStat>
+                  <AptStat label={LBL.nights[lang]}>{r.nights || "—"}</AptStat>
+                  <AptStat label={LBL.occ[lang]}>{r.occ != null ? `${r.occ.toFixed(0)}%` : "—"}</AptStat>
+                  <AptStat label={LBL.avgNight[lang]}>{r.adr != null ? fmt(r.adr) : "—"}</AptStat>
                 </div>
               </div>
             );
@@ -339,7 +368,7 @@ export function FinanceSection({ lang, STR, apartments, bookings, device }) {
           {rowIds.length > 1 && (
             <div className={`rounded-2xl border p-4 ${loss ? "border-red-600/30 bg-red-600/5" : "border-green-700/25 bg-green-50"}`}>
               <div className="flex items-center justify-between">
-                <span className="text-[13px] font-bold uppercase tracking-wide text-inksoft">{T("Итого", "Jami", "Total")}</span>
+                <span className="text-[13px] font-bold uppercase tracking-wide text-inksoft">{LBL.total[lang]}</span>
                 <span className={`font-serif text-[22px] tnum ${loss ? "text-red-600" : "text-green-700"}`}>{fmt(calc.total.profit)}</span>
               </div>
               <div className="text-[12px] text-inksoft mt-1 tnum">{fmt(calc.total.net)} − {fmt(calc.total.cost)}</div>
@@ -381,7 +410,7 @@ export function FinanceSection({ lang, STR, apartments, bookings, device }) {
       {/* expense journal */}
       <div className={card}>
         <div className="text-[13px] font-bold mb-3">{T("Расходы", "Xarajatlar", "Expenses")}</div>
-        <ExpenseForm lang={lang} T={T} apartments={apartments} onSaved={() => getExpenses().then(setExpenses)} />
+        <ExpenseForm lang={lang} T={T} apartments={apartments} rentAutoIds={rentAutoIds} onSaved={() => getExpenses().then(setExpenses)} />
         <div className="mt-4 space-y-1.5">
           {expenses === null && <div className="text-[13px] text-inksoft">…</div>}
           {expenses !== null && periodExpenses.length === 0 && (
@@ -416,8 +445,11 @@ export function FinanceSection({ lang, STR, apartments, bookings, device }) {
   );
 }
 
-function ExpenseForm({ lang, T, apartments, onSaved }) {
-  const today = new Date().toISOString().slice(0, 10);
+function ExpenseForm({ lang, T, apartments, rentAutoIds, onSaved }) {
+  // Tashkent "today", not UTC — between 00:00 and 05:00 local, toISOString() still says
+  // yesterday, and a default date just below the month boundary would file the expense
+  // into the PREVIOUS month's costs (the period filter works in local months)
+  const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tashkent" }).format(new Date());
   const [date, setDate] = useState(today);
   const [aptId, setAptId] = useState("");
   const [category, setCategory] = useState("cleaning");
@@ -488,6 +520,13 @@ function ExpenseForm({ lang, T, apartments, onSaved }) {
           </button>
         </div>
       </div>
+      {category === "rent" && aptId && rentAutoIds?.has(aptId) && (
+        <p className="mt-2.5 text-[12px] font-semibold text-amber-800 bg-amber-50 border border-amber-600/25 rounded-lg px-3 py-2">
+          {T("Аренда этой квартиры уже считается автоматически из паспорта — эта запись вычтет её из прибыли второй раз.",
+             "Bu kvartira ijarasi pasportdan avtomatik hisoblanadi — bu yozuv uni foydadan ikkinchi marta ayiradi.",
+             "This apartment's rent is already auto-counted from its property file — this entry will subtract it a second time.")}
+        </p>
+      )}
     </div>
   );
 }

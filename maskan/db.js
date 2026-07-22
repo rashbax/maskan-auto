@@ -200,10 +200,22 @@ export async function getMyBookings() {
 // ---------- admin: all bookings (RLS lets an admin read every row) ----------
 export async function getAllBookings() {
   const sb = createClient();
-  // newest first — a freshly arrived (or just-imported) booking shows at the top of the admin list
-  const { data, error } = await sb.from("bookings").select("*").order("created_at", { ascending: false });
-  if (error) return [];
-  return (data || []).map((b) => ({
+  // newest first — a freshly arrived (or just-imported) booking shows at the top of the admin
+  // list. Paged past PostgREST's silent 1000-row cap: finance/Dashboard math needs FULL history;
+  // an uncapped select would quietly drop the OLDEST rows once the table outgrows the cap.
+  const PAGE = 1000;
+  const data = [];
+  for (let start = 0; start < 20000; start += PAGE) {
+    const { data: chunk, error } = await sb
+      .from("bookings")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .range(start, start + PAGE - 1);
+    if (error) break;
+    data.push(...(chunk || []));
+    if (!chunk || chunk.length < PAGE) break;
+  }
+  return data.map((b) => ({
     id: b.id,
     apt: b.apartment_id,
     guest: b.guest_name,

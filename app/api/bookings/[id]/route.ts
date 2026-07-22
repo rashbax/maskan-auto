@@ -73,7 +73,7 @@ async function applyEarlyCheckout(id: string, newCheckout: string) {
   if (!b) return json({ error: "not_found" }, 404);
   if (b.status !== "active") return json({ error: "not_active" }, 409);
   // OTA bookings are owned by the channel; shortening here would be reverted by the next sync
-  if (b.source === "booking") return json({ error: "ota_not_editable" }, 409);
+  if (b.source === "booking" || b.source === "airbnb") return json({ error: "ota_not_editable" }, 409);
   // shorten only: the new checkout must sit strictly between check-in and the current checkout
   if (!(b.checkin < newCheckout && newCheckout < b.checkout)) return json({ error: "bad_range" }, 400);
 

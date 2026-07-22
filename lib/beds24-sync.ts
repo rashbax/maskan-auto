@@ -178,6 +178,15 @@ function otaReference(b: Beds24Record) {
   return pickString(b, ["apiReference", "reference", "bookingReference"]);
 }
 
+// Map the Beds24 channel to our booking source. Beds24 tags the channel on `referer`
+// ("Booking.com", "Airbnb", …). Only Airbnb is broken out; every other OTA stays "booking"
+// (unchanged behaviour), and an unknown/absent referer defaults to "booking" — so a wrong guess
+// can never do worse than today. Checks a few candidate keys defensively.
+function bookingSource(b: Beds24Record): "airbnb" | "booking" {
+  const ref = (pickString(b, ["referer", "referrer", "channel", "apiSource"]) || "").toLowerCase();
+  return ref.includes("airbnb") ? "airbnb" : "booking";
+}
+
 function partyAdults(b: Beds24Record) {
   return num(b.numAdult) ?? num(b.numAdults) ?? num(b.adults);
 }
@@ -399,12 +408,15 @@ export async function syncBeds24Bookings(opts: { from?: string; to?: string; boo
     // when the payload has no usable price — our own pushed bookings and cancelled rows carry
     // price=0. Owned rows (website/manual) are shielded from all of this by priceField below.
     const payloadPrice = totalUsd(b);
-    const total_usd =
-      payloadPrice != null && payloadPrice > 0
-        ? Math.round(payloadPrice)
-        : apt.price_usd != null
-          ? Math.round(apt.price_usd * nights)
-          : null;
+    const estimate = apt.price_usd != null ? Math.round(apt.price_usd * nights) : null;
+    // Tripwire for the "property currency is USD" assumption: a UZS/other-currency property
+    // would send prices orders of magnitude above the listing rate. Never store such a value
+    // as USD — keep the estimate and surface it in the logs instead of poisoning the P&L.
+    const suspicious = payloadPrice != null && estimate != null && payloadPrice > estimate * 5;
+    if (suspicious) {
+      console.error(`beds24 sync: booking ${b24Id} price ${payloadPrice} looks non-USD (estimate ${estimate}) — storing the estimate`);
+    }
+    const total_usd = payloadPrice != null && payloadPrice > 0 && !suspicious ? Math.round(payloadPrice) : estimate;
     const base = {
       apartment_id: apt.id,
       checkin: checkin!,
@@ -423,7 +435,11 @@ export async function syncBeds24Bookings(opts: { from?: string; to?: string; boo
       adults: partyAdults(b),
       children: partyChildren(b),
       ota_reference: otaReference(b),
-      commission_usd: commission != null && commission > 0 ? commission : null,
+      commission_usd: !suspicious && commission != null && commission > 0 ? commission : null,
+      // channel-derived source (airbnb vs booking). Lives in otaFields so it is written on insert
+      // AND re-applied on update for OTA rows — this also re-labels a booking imported before the
+      // channel split. Owned rows (website/manual) skip otaFields, so their source is never touched.
+      source: bookingSource(b),
     };
 
     const { data: existing, error: existingErr } = await sb
@@ -445,8 +461,16 @@ export async function syncBeds24Bookings(opts: { from?: string; to?: string; boo
       // price (the manual/site total is authored here; our own pushed rows carry price=0 anyway).
       const owned = e.source === "website" || e.source === "manual";
       const guestFields = owned ? {} : otaFields;
-      const priceField = owned ? { total_usd: e.total_usd } : {};
-      const next = { ...base, ...priceField, ...guestFields };
+      // Owned rows keep their locally-authored total. OTA rows keep previously stored REAL
+      // money whenever the fresh payload carries none — cancellations regularly arrive with
+      // price=0/commission=0 and must not wipe a recorded gross/fee back to an estimate/null.
+      const priceField = owned
+        ? { total_usd: e.total_usd }
+        : {
+            ...(payloadPrice != null && payloadPrice > 0 ? {} : { total_usd: e.total_usd ?? base.total_usd }),
+            ...(commission != null && commission > 0 ? {} : { commission_usd: e.commission_usd }),
+          };
+      const next = { ...base, ...guestFields, ...priceField };
       const keys = Object.keys(next) as (keyof ExistingBooking)[];
       if (!changed(e, next, keys)) {
         unchanged++;
@@ -473,8 +497,7 @@ export async function syncBeds24Bookings(opts: { from?: string; to?: string; boo
       id: bookingId,
       ...base,
       beds24_booking_id: b24Id,
-      source: "booking",
-      ...otaFields,
+      ...otaFields, // includes channel-derived `source` (airbnb vs booking)
     });
     if (error) {
       errors++;

@@ -45,7 +45,7 @@ export async function POST(req: Request) {
   // same single-line sanitation as /api/book (these fields reach Telegram notices / Beds24 notes)
   const guestName = oneLine(body.guestName, 100);
   const phone = oneLine(body.phone, 32);
-  const source = body.source === "booking" ? "booking" : "manual";
+  const source = body.source === "booking" || body.source === "airbnb" ? body.source : "manual";
   const totalNum = Number(body.total);
   const total = Number.isFinite(totalNum) ? Math.max(0, Math.round(totalNum)) : null;
   // party size (optional): adults is nullable, children defaults to 0; clamp to sane non-negatives

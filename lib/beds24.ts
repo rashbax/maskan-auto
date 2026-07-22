@@ -79,6 +79,10 @@ export async function getBookings(params: Record<string, string | string[]>) {
     const res = await b24<{ success?: boolean; data?: Beds24Booking[]; pages?: { nextPageExists?: boolean } }>(`/bookings?${qs}`);
     all.push(...(res.data || []));
     if (!res.pages?.nextPageExists) break;
+    if (page === MAX_BOOKING_PAGES) {
+      // the cap is a safety valve, not an expected state — surface it, never truncate silently
+      console.error(`beds24 getBookings: truncated at ${MAX_BOOKING_PAGES} pages (${all.length} rows) — narrow the window`);
+    }
   }
   return { success: true, data: all };
 }

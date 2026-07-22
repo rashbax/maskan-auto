@@ -14,6 +14,7 @@ const SRC = {
   website: { color: "#1B5E40", bg: "#EAF1EC", key: "src_website" },
   booking: { color: "#2A5B8C", bg: "#E7EEF6", key: "src_booking" },
   manual: { color: "#9A6A1E", bg: "#F6EEDD", key: "src_manual" },
+  airbnb: { color: "#E0565B", bg: "#FBE9E8", key: "src_airbnb" },
 };
 
 // { isoDate: booking } for this apartment's active bookings (value carries popover data)

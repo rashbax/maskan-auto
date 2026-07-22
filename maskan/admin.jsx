@@ -17,6 +17,7 @@ const SRC = {
   website: { color: "#1B5E40", bg: "#EAF1EC", key: "src_website" },
   booking: { color: "#2A5B8C", bg: "#E7EEF6", key: "src_booking" },
   manual: { color: "#9A6A1E", bg: "#F6EEDD", key: "src_manual" },
+  airbnb: { color: "#E0565B", bg: "#FBE9E8", key: "src_airbnb" },
 };
 
 function StatCard({ label, value, sub, accent }) {
@@ -67,7 +68,7 @@ function Dashboard({ lang, STR, bookings, apartments, onOpenDetail }) {
   const mStart = new Date(y, mo, 1), mEnd = new Date(y, mo + 1, 1);
   let bookedNights = 0, monthRevenue = 0;
   // per-source breakdown for the same in-month, prorated window (feature: source performance)
-  const bySource = { website: { count: 0, nights: 0, revenue: 0 }, booking: { count: 0, nights: 0, revenue: 0 }, manual: { count: 0, nights: 0, revenue: 0 } };
+  const bySource = { website: { count: 0, nights: 0, revenue: 0 }, booking: { count: 0, nights: 0, revenue: 0 }, airbnb: { count: 0, nights: 0, revenue: 0 }, manual: { count: 0, nights: 0, revenue: 0 } };
   for (const b of list) {
     if (b.status === "cancelled") continue;
     const s = Math.max(new Date(b.from).getTime(), mStart.getTime());
@@ -124,12 +125,12 @@ function Dashboard({ lang, STR, bookings, apartments, onOpenDetail }) {
 // current-month performance by booking source (count / booked nights / prorated revenue + shares)
 function SourceBreakdown({ lang, STR, bySource, totalNights, totalRevenue }) {
   const T = (ru, uz, en) => (lang === "ru" ? ru : lang === "uz" ? uz : en);
-  const order = ["website", "booking", "manual"];
+  const order = ["website", "booking", "airbnb", "manual"];
   if (!order.some((k) => bySource[k].count > 0)) return null;
   return (
     <div>
       <h3 className="font-serif text-[19px] mb-3">{T("По источнику", "Manba boʻyicha", "By source")} · {calMonths[lang][MASKAN.TODAY.getMonth()]}</h3>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         {order.map((k) => {
           const s = bySource[k], c = SRC[k];
           const revShare = totalRevenue > 0 ? Math.round((s.revenue / totalRevenue) * 100) : 0;
@@ -445,8 +446,8 @@ function ManualBookingForm({ lang, STR, apartments, onDone }) {
         </div></label>
       <div>
         <span className="text-[13px] font-bold">{STR[lang].a_source}</span>
-        <div className="grid grid-cols-2 gap-2.5 mt-1.5">
-          {[["manual", STR[lang].src_manual], ["booking", STR[lang].src_booking]].map(([k, label]) => (
+        <div className="grid grid-cols-3 gap-2.5 mt-1.5">
+          {[["manual", STR[lang].src_manual], ["booking", STR[lang].src_booking], ["airbnb", STR[lang].src_airbnb]].map(([k, label]) => (
             <button key={k} type="button" onClick={() => setSource(k)} className={`flex items-center justify-center gap-2 h-11 rounded-xl border text-[14px] font-semibold transition ${source === k ? "border-green-600 bg-green-50 text-green-700" : "border-line bg-white text-ink"}`}>
               <span className="w-2.5 h-2.5 rounded-full" style={{ background: SRC[k].color }} />{label}
             </button>
@@ -528,7 +529,7 @@ function BookingsList({ lang, STR, bookings, apartments, onChanged, onOpenDetail
   useEffect(() => { setLimit(25); }, [status, source, query]); // a new filter/search resets the window
 
   const statusOpts = [["all", STR[lang].a_all], ["active", STR[lang].tab_active], ["cancelled", STR[lang].tab_cancelled], ["done", STR[lang].st_completed]];
-  const sourceOpts = [["all", STR[lang].a_all, null], ["website", STR[lang].src_website, SRC.website.color], ["booking", STR[lang].src_booking, SRC.booking.color], ["manual", STR[lang].src_manual, SRC.manual.color]];
+  const sourceOpts = [["all", STR[lang].a_all, null], ["website", STR[lang].src_website, SRC.website.color], ["booking", STR[lang].src_booking, SRC.booking.color], ["airbnb", STR[lang].src_airbnb, SRC.airbnb.color], ["manual", STR[lang].src_manual, SRC.manual.color]];
 
   return (
     <div>
@@ -1232,7 +1233,7 @@ export function Admin({ lang, STR, device, onExit, openLang, role, auth, onLogin
             : tab === "dash" ? <Dashboard lang={lang} STR={STR} bookings={bookings} apartments={apts} onOpenDetail={setDetail} />
             : tab === "list" ? <Listings lang={lang} STR={STR} onEdit={goEdit} apartments={apts} />
             : tab === "cal" ? <CalManager lang={lang} STR={STR} apartments={apts} bookings={bookings} device={device} />
-            : tab === "fin" ? <FinanceSection lang={lang} STR={STR} apartments={apts} bookings={bookings} device={device} />
+            : tab === "fin" ? <FinanceSection lang={lang} apartments={apts} bookings={bookings} device={device} />
             : tab === "reviews" ? <ReviewsModeration lang={lang} STR={STR} apartments={apts} />
             : tab === "pfile" ? <PropertyFilesSection lang={lang} STR={STR} apartments={apts} />
             : tab === "suppliers" ? <SuppliersSection lang={lang} STR={STR} />
