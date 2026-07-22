@@ -23,13 +23,13 @@ const rows = j.data || [];
 console.log(`bookings in window: ${rows.length}\n`);
 
 for (const b of rows) {
+  if (b.referer === "API") continue; // skip our own direct/pushed rows — focus on OTA channels
   console.log({
     id: b.id,
     referer: b.referer,
-    apiSource: b.apiSource,
-    channel: b.channel,
-    apiReference: b.apiReference,
-    reference: b.reference,
+    price: b.price,
+    commission: b.commission,
+    net_calc: b.price != null && b.commission != null ? Math.round((b.price - b.commission) * 100) / 100 : null,
     status: b.status,
     stay: `${b.arrival}→${b.departure}`,
     name: [b.firstName, b.lastName].filter(Boolean).join(" "),
